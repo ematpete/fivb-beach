@@ -101,6 +101,11 @@
     text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px;}
   .month::after{content:"";flex:1;height:1px;background:var(--line);}
   .list{display:flex;flex-direction:column;gap:8px;}
+  .livepin{margin-bottom:28px;padding-bottom:20px;border-bottom:1px dashed var(--line);}
+  .livepin-lab{display:flex;align-items:center;gap:9px;margin-bottom:10px;font-family:var(--mono);
+    font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--green);}
+  .livepin-lab .pulse{width:8px;height:8px;border-radius:50%;background:var(--green);
+    box-shadow:0 0 0 0 var(--green);animation:pulse 1.6s infinite;}
   .row{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;
     background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
     padding:13px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
@@ -150,7 +155,7 @@
   .scrim{position:fixed;inset:0;background:rgba(8,14,17,.55);backdrop-filter:blur(2px);
     opacity:0;pointer-events:none;transition:opacity .2s;z-index:40;}
   .scrim.open{opacity:1;pointer-events:auto;}
-  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(660px,100%);background:var(--surface);
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(750px,100%);background:var(--surface);
     border-left:1px solid var(--line);box-shadow:-20px 0 60px rgba(0,0,0,.28);
     transform:translateX(100%);transition:transform .26s cubic-bezier(.4,.14,.2,1);z-index:50;
     display:flex;flex-direction:column;}
@@ -170,6 +175,7 @@
   .livebtn:disabled{opacity:.6;cursor:default;}
   .vtoggle{display:inline-flex;margin-top:12px;background:var(--surface-2);border:1px solid var(--line);
     border-radius:9px;padding:3px;gap:3px;}
+  .vtoggle[hidden]{display:none;}
   .vt{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);background:none;
     border:none;border-radius:6px;padding:6px 13px;cursor:pointer;}
   .vt[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);}
@@ -415,6 +421,10 @@
       <div class="dmeta" id="dMeta"></div>
       <button class="livebtn" id="liveBtn" type="button" title="Aktuellste Ergebnisse direkt von der FIVB-Quelle laden (umgeht den stündlichen Cache)">⟳ Live</button>
     </div>
+    <div class="vtoggle" id="genderToggle" role="group" aria-label="Geschlecht" hidden>
+      <button class="vt" data-g="M" type="button" aria-pressed="true">Herren</button>
+      <button class="vt" data-g="W" type="button" aria-pressed="false">Damen</button>
+    </div>
     <div class="vtoggle" id="vtoggle" role="group" aria-label="Ansicht">
       <button class="vt" data-view="list" type="button" aria-pressed="true">☰ Liste</button>
       <button class="vt" data-view="bracket" type="button" aria-pressed="false">⑃ Baum</button>
@@ -481,6 +491,34 @@ function renderStats(){
     `<div class="tile"><div class="num">${n}</div><div class="lab">${l}</div></div>`).join('');
 }
 
+function eventRow(e){
+  const tv=tierColor(e.tier);
+  const genders=[e.M?'M':null,e.W?'W':null].filter(Boolean).join(' · ');
+  const rNo=eventResultNo(e);
+  const st = e.status==='live'
+    ? `<span class="status live"><span class="pulse"></span>Live</span>`
+    : e.status==='upcoming'
+      ? `<span class="status upcoming">Kommend</span>`
+      : `<span class="status finished">Gespielt</span>`;
+  const cue = rNo
+    ? `<span class="reslabel">Ergebnisse<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>`
+    : '';
+  return `
+    <div class="row ${rNo?'clickable':''}" style="--tier:${tv}"
+      ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="Ergebnisse ${e.city} öffnen"`:''}>
+      <div class="date">${fmtRange(e.start,e.end)}<b>${e.start.slice(8)}. ${MONTHS[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
+      <div class="main">
+        <div class="city">${e.city}
+          <span class="badges"><span class="org ${e.org}">${e.org}</span>
+          <span class="tier-badge" style="--tier:${tv}">${e.tier}</span>
+          <span class="gender">${genders||'–'}</span></span>
+        </div>
+        <div class="country">${country(e.country)}</div>
+      </div>
+      <div class="right">${st}${cue}</div>
+    </div>`;
+}
+
 function render(){
   const list=document.getElementById('list');
   const q=state.q.toLowerCase().trim();
@@ -494,7 +532,13 @@ function render(){
   });
   document.getElementById('empty').hidden = ev.length>0;
 
-  let html='', curMonth='', listOpen=false;
+  let html='';
+  const liveNow = DATA.events.filter(e=>e.status==='live');
+  if(liveNow.length){
+    html += `<div class="livepin"><div class="livepin-lab"><span class="pulse"></span>Live jetzt</div>`
+      + `<div class="list">${liveNow.map(eventRow).join('')}</div></div>`;
+  }
+  let curMonth='', listOpen=false;
   for(const e of ev){
     const mk = e.start.slice(0,7);
     if(mk!==curMonth){
@@ -504,37 +548,13 @@ function render(){
       html += `<div class="month">${MONTHS[+m-1]} ${y}</div><div class="list">`;
       listOpen=true;
     }
-    const tv=tierColor(e.tier);
-    const genders=[e.M?'M':null,e.W?'W':null].filter(Boolean).join(' · ');
-    const rNo=eventResultNo(e);
-    const st = e.status==='live'
-      ? `<span class="status live"><span class="pulse"></span>Live</span>`
-      : e.status==='upcoming'
-        ? `<span class="status upcoming">Kommend</span>`
-        : `<span class="status finished">Gespielt</span>`;
-    const cue = rNo
-      ? `<span class="reslabel">Ergebnisse<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>`
-      : '';
-    html += `
-      <div class="row ${rNo?'clickable':''}" style="--tier:${tv}"
-        ${rNo?`role="button" tabindex="0" data-no="${rNo}" data-city="${encodeURIComponent(e.city)}" data-tier="${e.tier}" data-org="${e.org}" data-gender="${genders}" aria-label="Ergebnisse ${e.city} öffnen"`:''}>
-        <div class="date">${fmtRange(e.start,e.end)}<b>${e.start.slice(8)}. ${MONTHS[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
-        <div class="main">
-          <div class="city">${e.city}
-            <span class="badges"><span class="org ${e.org}">${e.org}</span>
-            <span class="tier-badge" style="--tier:${tv}">${e.tier}</span>
-            <span class="gender">${genders||'–'}</span></span>
-          </div>
-          <div class="country">${country(e.country)}</div>
-        </div>
-        <div class="right">${st}${cue}</div>
-      </div>`;
+    html += eventRow(e);
   }
   if(listOpen) html += '</div>';
   list.innerHTML = html;
 
   list.querySelectorAll('.row.clickable').forEach(r=>{
-    const open=()=>openDrawer(r.dataset.no, decodeURIComponent(r.dataset.city), r.dataset.tier, r.dataset.org, r.dataset.gender);
+    const open=()=>openDrawer(DATA.events[+r.dataset.idx]);
     r.addEventListener('click',open);
     r.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});
   });
@@ -758,13 +778,13 @@ async function fetchLiveMatches(no){
   return out;
 }
 async function refreshLive(){
-  const btn=document.getElementById('liveBtn'), {no,city,tier,org}=cur;
+  const btn=document.getElementById('liveBtn'), {no,ev,gender}=cur;
   btn.disabled=true; btn.textContent='⟳ Lädt…';
   try{
     const matches=await fetchLiveMatches(no);
     if(!matches.length) throw new Error('leer');
     DATA.results[no]=matches;
-    openDrawer(no,city,tier,org);
+    openDrawer(ev,gender);
     render();
     flash('Live-Daten direkt von FIVB geladen.');
   }catch(e){
@@ -775,22 +795,30 @@ async function refreshLive(){
 }
 document.getElementById('liveBtn').addEventListener('click', refreshLive);
 
-function openDrawer(no,city,tier,org){
+function openDrawer(ev,gender){
+  const mNo = ev.M && resultNos.has(ev.M.no) ? ev.M.no : null;
+  const wNo = ev.W && resultNos.has(ev.W.no) ? ev.W.no : null;
+  const g = (gender==='M'&&mNo) || (gender==='W'&&wNo) ? gender : (mNo ? 'M' : 'W');
+  const no = g==='M' ? mNo : wNo;
   const matches=DATA.results[no];
   const byN={}; matches.forEach(m=>byN[m.n]=m);
   const finals=matches.filter(m=>m.rc==='F1');
   const finalM=finals[0], finalDone=finalM&&played(finalM);
   const champ=finalDone ? (+finalM.sa>+finalM.sb?finalM.a:finalM.b) : null;
   const bracketOK = finals.length===1 && matches.some(m=>m.rc==='QF'||m.rc==='SF');
-  cur={no,city,tier,org,matches,byN};
+  cur={no,city:ev.city,tier:ev.tier,org:ev.org,matches,byN,ev,gender:g,mNo,wNo};
 
-  document.getElementById('dTitle').textContent = `${city} — Herren`;
+  document.getElementById('dTitle').textContent = `${ev.city} — ${g==='M'?'Herren':'Damen'}`;
   document.getElementById('dMeta').textContent =
-    `${org} · ${tier} · ${matches.filter(played).length}/${matches.length} Matches gespielt · ${DATA.season}`;
+    `${ev.org} · ${ev.tier} · ${matches.filter(played).length}/${matches.length} Matches gespielt · ${DATA.season}`;
   document.getElementById('dChamp').innerHTML = champ
     ? `<div class="champ"><span class="trophy">🏆</span><div>
         <div class="clab">Champion</div><div class="cname">${champ}</div></div></div>`
     : `<div class="livebanner"><span class="pulse"></span>Turnier läuft noch — Ergebnisse werden laufend ergänzt</div>`;
+
+  const gt=document.getElementById('genderToggle');
+  gt.hidden = !(mNo && wNo);
+  gt.querySelectorAll('.vt').forEach(b=>b.setAttribute('aria-pressed', b.dataset.g===g));
 
   document.querySelector('#vtoggle .vt[data-view="bracket"]').hidden = !bracketOK;
   if(!bracketOK) drawerView='list';
@@ -799,6 +827,10 @@ function openDrawer(no,city,tier,org){
   scrim.classList.add('open'); drawer.classList.add('open'); drawer.setAttribute('aria-hidden','false');
   document.getElementById('dclose').focus();
 }
+document.getElementById('genderToggle').addEventListener('click',e=>{
+  const b=e.target.closest('.vt'); if(!b||b.getAttribute('aria-pressed')==='true') return;
+  openDrawer(cur.ev, b.dataset.g);
+});
 
 function setView(v){
   drawerView=v;
@@ -928,8 +960,22 @@ function renderBracket(){
       + feederCol.map(m=>`<div class="cell">${m?bracketBox(m):'<div class="bx empty"></div>'}</div>`).join('') + `</div></div>`;
     skipped=skipped.filter(rc=>rc!==feederRc);
   }
+  // Jede weitere Spine-Runde wird anhand der Zubringer-Codes (fa/fb) zur vorigen Runde
+  // sortiert, nicht nach Matchnummer — sonst passt die Sieger-Linie im Baum nicht:
+  // Zelle i einer Runde muss von den Zellen 2i/2i+1 der vorigen Runde gespeist werden.
+  const orderByFeeders=(prevOrdered,pool)=>{
+    const remaining=pool.slice(), out=[];
+    for(let i=0;i<prevOrdered.length;i+=2){
+      const nos=[prevOrdered[i],prevOrdered[i+1]].filter(Boolean).map(x=>x.n);
+      const idx=remaining.findIndex(m=>[m.fa,m.fb].some(code=>code && nos.includes(+code.slice(1))));
+      if(idx>=0){ out.push(remaining[idx]); remaining.splice(idx,1); }
+    }
+    return out.concat(remaining);  // ohne gefundenen Zubringer: hinten anhaengen, nichts verlieren
+  };
+  let prevOrdered=firstMs;
   chain.forEach((rc,i)=>{
-    const ms=present[rc].slice().sort((a,b)=>a.n-b.n);
+    const ms = i===0 ? firstMs : orderByFeeders(prevOrdered, present[rc]);
+    prevOrdered=ms;
     const cls = i<chain.length-1 ? 'binary' : '';
     cols += `<div class="rnd ${cls}"><div class="rlab">${roundLabel(rc,ms[0].rn)}</div><div class="cells">`
       + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div></div>`;
@@ -1067,6 +1113,7 @@ function flash(msg, warn){
 function applyData(j){
   closeDrawer();
   DATA=j; resultNos=new Set(Object.keys(DATA.results));
+  DATA.events.forEach((e,i)=>e._idx=i);
   renderStats(); render(); updateStand(); updateMeta();
 }
 async function loadSeason(y, silent){
@@ -1095,6 +1142,7 @@ document.getElementById('seasonSel').addEventListener('change', e=>loadSeason(+e
 
 // ---- Init ----
 buildSeasonSelect();
+DATA.events.forEach((e,i)=>e._idx=i);
 renderStats(); render(); updateStand(); updateMeta();
 loadSeason(season, true);   // beim Laden still versuchen, aktuelle Saison-Datei zu ziehen (funktioniert gehostet)
 </script>

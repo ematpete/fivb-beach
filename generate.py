@@ -246,11 +246,13 @@ def main():
     events = build_events(tour)
     print(f"[generate] {len(events)} relevante Events (FIVB+CEV)")
 
-    # Ergebnisse fuer gespielte/laufende Events – Herren-Turnier je Event
+    # Ergebnisse fuer gespielte/laufende Events – Herren- UND Damen-Turnier je Event
     todo = []
     for e in events:
-        if e["status"] in ("finished", "live") and e.get("M"):
-            todo.append(e["M"]["no"])
+        if e["status"] not in ("finished", "live"):
+            continue
+        if e.get("M"): todo.append(e["M"]["no"])
+        if e.get("W"): todo.append(e["W"]["no"])
     print(f"[generate] Ergebnisse fuer {len(todo)} Turniere laden …")
 
     results, venues, players = {}, {}, set()
