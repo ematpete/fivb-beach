@@ -52,11 +52,21 @@ def clean_country(c):
 
 
 # ---------------------------------------------------------------- Turniere
-def classify(name):
-    """Nur relevante Turniere: FIVB Beach Pro Tour + CEV. Sonst None.
+# Rauschen, das in aelteren Saisons (vor der "BPT"-Marke ab 2023) mitkommt:
+# Jugend-Quali, Zonal-/Satelliten-/Kontinentalverbands-Turniere, Multi-Sport-Games.
+AGE_RE = re.compile(r"\bU1[0-9]\b|\bU2[0-9]\b|\bYouth\b|\bJunior\b", re.I)
+NOISE_RE = re.compile(
+    r"Snow Tour|Satellite|\bZonal\b|Sub[- ]?Zonal|Qualif|Development|Continental Cup|"
+    r"\bTest\b|Training|\bAVC\b|\bCAVB\b|\bNORCECA\b|\bCSVP\b|\bASVBF\b|\bEEVZA\b|\bNEVZA\b|"
+    r"African Games|Mediterranean.*Games|SEA Games|\bFISU\b|Commonwealth Games|King of the Court",
+    re.I)
+
+
+def classify(name, code="", teams=None, season=None):
+    """Nur relevante Turniere: FIVB Beach Pro Tour + CEV (+ deren Vorgaenger vor 2023). Sonst None.
     Rueckgabe: (org, tier, city)."""
     n = name
-    if "CANCELLED" in n:
+    if re.search(r"CANCEL", n, re.I):
         return None
     if re.search(r"\bBPT\b", n):
         tier = ("Elite16" if "Elite16" in n else "Elite" if "Elite" in n else
@@ -79,7 +89,33 @@ def classify(name):
             return ("CEV", "Nations Cup", city)
         if n.startswith("CEVP"):
             return ("CEV", "CEV Tour", re.sub(r"^CEVP\s*-\s*", "", n).strip())
+        # alte CEV-Turnierform (vor 2023): ECH-Finals und "Masters"-Tour explizit,
+        # Rest nur wenn kein Jugend-/Satelliten-/Zonal-Rauschen
+        if re.search(r"\bECH\b", n) and not AGE_RE.search(n):
+            city = re.sub(r"^CEV\s+ECH\s*(Final)?\s*-?\s*", "", n, flags=re.I).strip()
+            return ("CEV", "EM", city or "EM")
+        if re.search(r"\bMasters\b", n, re.I):
+            city = re.sub(r"^CEV\s+", "", re.sub(r"\s+Masters\b", "", n, flags=re.I)).strip()
+            return ("CEV", "Masters", city)
+        if NOISE_RE.search(n) or AGE_RE.search(n):
+            return None
         return ("CEV", "CEV", re.sub(r"^CEV\s+", "", n).strip())
+    # Alte FIVB-Turnierform (vor 2023): kein "BPT"-Tag, Name = reiner Ortsname.
+    # Unterscheidung Top-Tour vs. Zonal/Satellit/Quali ueber Hauptfeldgroesse,
+    # da der Turniername selbst keine Stufe mehr angibt.
+    if NOISE_RE.search(n) or AGE_RE.search(n):
+        return None
+    # Nur fuer Saisons vor der "BPT"-Marke (ab 2023) noetig – danach ist BPT die
+    # verlaessliche Kennung und alles andere bewusst raus.
+    if season is not None and season >= 2023:
+        return None
+    # Nationale Verbandstouren (Brasilien, Estland, Italien, ...) nutzen Codes wie
+    # "NBRA0113"/"NEST0113" (Land-Praefix); die echte FIVB-Tour nutzt "M"/"W" + Stadtkuerzel
+    # (z. B. "MGST2013"). Nur Letzteres zaehlt als internationaler Tour-Stopp.
+    if teams is not None and teams >= 24 and code[:1] in "MW":
+        base = code[1:]
+        tier = "World Champs" if re.match(r"WCH", base, re.I) or "World Championship" in n else "World Tour"
+        return ("FIVB", tier, n.strip())
     return None
 
 
@@ -87,7 +123,7 @@ def build_events(tournaments):
     """Paart Herren/Damen je Turnier und leitet Status aus dem Datum ab."""
     groups = {}
     for t in tournaments:
-        cl = classify(t["Name"])
+        cl = classify(t["Name"], t.get("Code", ""), num(t.get("NbTeamsMainDraw")), num(t.get("Season")))
         if not cl:
             continue
         org, tier, city = cl
@@ -205,7 +241,7 @@ def main():
     print(f"[generate] Saison {SEASON} · Stand {TODAY}")
     tour = [t.attrib for t in vis(
         "<Request Type='GetBeachTournamentList' "
-        "Fields='No Code Name CountryName StartDateMainDraw EndDateMainDraw Gender Type Season'>"
+        "Fields='No Code Name CountryName StartDateMainDraw EndDateMainDraw Gender Type Season NbTeamsMainDraw'>"
         f"<Filter Season='{SEASON}'/></Request>").iter("BeachTournament")]
     events = build_events(tour)
     print(f"[generate] {len(events)} relevante Events (FIVB+CEV)")
@@ -237,10 +273,12 @@ def main():
 
     data = {"season": SEASON, "generated": TODAY, "events": events,
             "results": results, "venues": venues, "players": profiles}
-    with open("data.json", "w", encoding="utf-8") as f:
+    os.makedirs("data", exist_ok=True)
+    out = f"data/{SEASON}.json"
+    with open(out, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
-    size = os.path.getsize("data.json")
-    print(f"[generate] data.json geschrieben ({size/1024:.0f} KB) · "
+    size = os.path.getsize(out)
+    print(f"[generate] {out} geschrieben ({size/1024:.0f} KB) · "
           f"{len(events)} Events, {len(results)} mit Ergebnissen, {len(profiles)} Profile")
 
 
