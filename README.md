@@ -33,7 +33,7 @@ generate.py                → VIS-Abruf → data.json (nur Python-Standardlib)
    Repo → *Actions* → ggf. Workflows aktivieren. Der Cron läuft dann stündlich.
    Sofort testen: *Actions* → **VIS-Daten aktualisieren** → **Run workflow**.
 
-4. **(Optional) Eigene Domain** (z. B. `fivb.12ndr.at`):
+4. **(Optional) Eigene Domain** (z. B. `test.fivb.com`):
    *Settings* → *Pages* → *Custom domain* eintragen und beim DNS einen
    `CNAME` auf `DEINNAME.github.io` setzen.
 
