@@ -155,7 +155,7 @@
   .scrim{position:fixed;inset:0;background:rgba(8,14,17,.55);backdrop-filter:blur(2px);
     opacity:0;pointer-events:none;transition:opacity .2s;z-index:40;}
   .scrim.open{opacity:1;pointer-events:auto;}
-  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(750px,100%);background:var(--surface);
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(920px,100%);background:var(--surface);
     border-left:1px solid var(--line);box-shadow:-20px 0 60px rgba(0,0,0,.28);
     transform:translateX(100%);transition:transform .26s cubic-bezier(.4,.14,.2,1);z-index:50;
     display:flex;flex-direction:column;}
@@ -164,7 +164,7 @@
   .drawer .dclose{position:absolute;top:16px;right:16px;background:var(--surface-2);border:1px solid var(--line);
     border-radius:8px;width:32px;height:32px;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;}
   .drawer .dclose:hover{color:var(--ink);}
-  .drawer.wide{width:min(1080px,100%);}
+  .drawer.wide{width:min(1220px,100%);}
   .drawer h2{margin:0 0 4px;font-size:22px;letter-spacing:-.01em;}
   .drawer .dmeta{font-family:var(--mono);font-size:12px;color:var(--muted);}
   .dmeta-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
@@ -618,12 +618,15 @@ function teamPlayers(m, side){
     return `<span class="plink" data-p="${no}" role="button" tabindex="0">${ln}</span>`;}).join('/');
 }
 
-// alle Begegnungen zweier Teams in den geladenen Turnieren
+// alle Begegnungen zweier Teams — ueber alle (bereits geladenen) Saisonen hinweg
 function encounters(teamA,teamB){
   const K=[teamA,teamB].sort().join('||'), out=[];
-  for(const [tno,ms] of Object.entries(DATA.results))
-    for(const mm of ms)
-      if(played(mm) && [mm.a,mm.b].sort().join('||')===K) out.push({tno,mm});
+  for(const sd of Object.values(seasonCache)){
+    for(const [tno,ms] of Object.entries(sd.results||{}))
+      for(const mm of ms)
+        if(played(mm) && [mm.a,mm.b].sort().join('||')===K)
+          out.push({mm, city:((sd.venues||{})[tno]||{}).city||''});
+  }
   return out;
 }
 function buildH2H(m){
@@ -632,12 +635,11 @@ function buildH2H(m){
   let wa=0,wb=0;
   enc.forEach(({mm})=>{ const w=(+mm.sa>+mm.sb)?mm.a:mm.b; if(w===m.a) wa++; else wb++; });
   const rows=enc.sort((x,y)=>(x.mm.date||'').localeCompare(y.mm.date||''))
-    .map(({tno,mm})=>{
-      const city=(DATA.venues[tno]||{}).city||'';
-      return `<div class="h2r${mm===m?' cur':''}"><span class="h2d">${mm.date||''}</span>
-        <span class="h2c">${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${mm.sa}:${mm.sb}</span></div>`;
-    }).join('');
-  return `<div class="h2h"><div class="h2title">Head-to-Head <span class="h2note">(in geladenen Turnieren)</span></div>
+    .map(({mm,city})=>`<div class="h2r${mm===m?' cur':''}"><span class="h2d">${mm.date||''}</span>
+        <span class="h2c">${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${mm.sa}:${mm.sb}</span></div>`)
+    .join('');
+  const note = allSeasonsLoaded ? 'alle Saisonen' : 'lädt weitere Saisonen …';
+  return `<div class="h2h"><div class="h2title">Head-to-Head <span class="h2note">(${note})</span></div>
     <div class="h2bal"><span class="${wa>=wb?'lead':''}">${m.a} · ${wa}</span><span class="h2dash">–</span><span class="${wb>wa?'lead':''}">${wb} · ${m.b}</span></div>
     <div class="h2list">${rows}</div></div>`;
 }
@@ -778,13 +780,14 @@ async function fetchLiveMatches(no){
   return out;
 }
 async function refreshLive(){
-  const btn=document.getElementById('liveBtn'), {no,ev,gender}=cur;
+  const btn=document.getElementById('liveBtn'), {no}=cur;
   btn.disabled=true; btn.textContent='⟳ Lädt…';
   try{
     const matches=await fetchLiveMatches(no);
     if(!matches.length) throw new Error('leer');
-    DATA.results[no]=matches;
-    openDrawer(ev,gender);
+    DATA.results[no]=matches; cur.matches=matches;
+    const byN={}; matches.forEach(m=>byN[m.n]=m); cur.byN=byN;
+    reRenderKeepOpen();
     render();
     flash('Live-Daten direkt von FIVB geladen.');
   }catch(e){
@@ -795,18 +798,14 @@ async function refreshLive(){
 }
 document.getElementById('liveBtn').addEventListener('click', refreshLive);
 
-function openDrawer(ev,gender){
-  const mNo = ev.M && resultNos.has(ev.M.no) ? ev.M.no : null;
-  const wNo = ev.W && resultNos.has(ev.W.no) ? ev.W.no : null;
-  const g = (gender==='M'&&mNo) || (gender==='W'&&wNo) ? gender : (mNo ? 'M' : 'W');
-  const no = g==='M' ? mNo : wNo;
-  const matches=DATA.results[no];
-  const byN={}; matches.forEach(m=>byN[m.n]=m);
+// Titel/Meta/Champion/Umschalter aus cur neu aufbauen — ohne Oeffnen/Fokus/Animation
+// anzustossen, damit ein stiller Hintergrund-Refresh (Live, H2H) den State nicht stoert.
+function updateDrawerContent(){
+  const {matches,ev,gender:g,mNo,wNo}=cur;
   const finals=matches.filter(m=>m.rc==='F1');
   const finalM=finals[0], finalDone=finalM&&played(finalM);
   const champ=finalDone ? (+finalM.sa>+finalM.sb?finalM.a:finalM.b) : null;
   const bracketOK = finals.length===1 && matches.some(m=>m.rc==='QF'||m.rc==='SF');
-  cur={no,city:ev.city,tier:ev.tier,org:ev.org,matches,byN,ev,gender:g,mNo,wNo};
 
   document.getElementById('dTitle').textContent = `${ev.city} — ${g==='M'?'Herren':'Damen'}`;
   document.getElementById('dMeta').textContent =
@@ -822,10 +821,50 @@ function openDrawer(ev,gender){
 
   document.querySelector('#vtoggle .vt[data-view="bracket"]').hidden = !bracketOK;
   if(!bracketOK) drawerView='list';
+}
+// offene Match-Details vor einem Neu-Render merken und danach wiederherstellen
+function reRenderKeepOpen(){
+  const openNos=[...document.querySelectorAll('.mdetail:not([hidden])')].map(el=>el.dataset.for);
+  updateDrawerContent();
+  setView(drawerView);
+  openNos.forEach(n=>{
+    const row=document.querySelector(`.match[data-n="${n}"]`);
+    if(row) toggleMatch(row);
+  });
+}
+function openDrawer(ev,gender){
+  const mNo = ev.M && resultNos.has(ev.M.no) ? ev.M.no : null;
+  const wNo = ev.W && resultNos.has(ev.W.no) ? ev.W.no : null;
+  const g = (gender==='M'&&mNo) || (gender==='W'&&wNo) ? gender : (mNo ? 'M' : 'W');
+  const no = g==='M' ? mNo : wNo;
+  const matches=DATA.results[no];
+  const byN={}; matches.forEach(m=>byN[m.n]=m);
+  cur={no,city:ev.city,tier:ev.tier,org:ev.org,matches,byN,ev,gender:g,mNo,wNo};
+
+  updateDrawerContent();
   setView(drawerView);
 
   scrim.classList.add('open'); drawer.classList.add('open'); drawer.setAttribute('aria-hidden','false');
   document.getElementById('dclose').focus();
+
+  // Head-to-Head ueber alle Saisonen: im Hintergrund nachladen, offenen Match-Details
+  // danach die vollstaendige Historie nachreichen (State bleibt erhalten).
+  if(!allSeasonsLoaded){
+    ensureAllSeasonsLoaded().then(()=>{
+      if(!cur || cur.ev!==ev || cur.no!==no) return;  // Drawer inzwischen gewechselt
+      reRenderKeepOpen();
+    });
+  }
+  // Laeuft das Turnier gerade, beim Oeffnen still die aktuellsten Ergebnisse direkt von
+  // FIVB nachladen — kein Warten auf den stuendlichen Cache oder den Live-Button.
+  if(ev.status==='live'){
+    fetchLiveMatches(no).then(fresh=>{
+      if(!fresh.length || !cur || cur.ev!==ev || cur.no!==no) return;
+      DATA.results[no]=fresh; cur.matches=fresh;
+      const byN2={}; fresh.forEach(m=>byN2[m.n]=m); cur.byN=byN2;
+      reRenderKeepOpen();
+    }).catch(()=>{});
+  }
 }
 document.getElementById('genderToggle').addEventListener('click',e=>{
   const b=e.target.closest('.vt'); if(!b||b.getAttribute('aria-pressed')==='true') return;
@@ -866,6 +905,7 @@ function renderPoolStandings(rm){
 
 function renderList(){
   const {matches}=cur;
+  const chainInfo=computeChainOrder(matches);
   const codes=[...new Set(matches.map(m=>m.rc))].map(rc=>{
     const rn=(matches.find(m=>m.rc===rc)||{}).rn;
     return {rc,rn,rank:roundRank(rc,rn),macro:macroOf(rc,rn)};
@@ -873,7 +913,10 @@ function renderList(){
 
   let body='', curMacro='';
   for(const {rc,rn,macro} of codes){
-    const rm=matches.filter(m=>m.rc===rc).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    // KO-Spielbaum-Runden folgen der Zubringer-Reihenfolge (oben speist oben), sonst chronologisch
+    const rm = chainInfo && chainInfo.byRc[rc]
+      ? chainInfo.byRc[rc].filter(Boolean)
+      : matches.filter(m=>m.rc===rc).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
     if(!rm.length) continue;
     if(macro!==curMacro){
       curMacro=macro; const mc=MACRO[macro];
@@ -921,8 +964,9 @@ function bracketBox(m){
     ${brow(A,aWin,m.sa,m.sda)}${brow(B,bWin,m.sb,m.sdb)}</div>`;
 }
 
-function renderBracket(){
-  const {matches}=cur;
+// Baum-Reihenfolge einmal berechnen — von renderBracket() UND renderList() genutzt,
+// damit beide Ansichten dieselbe Zubringer-Logik zeigen (oben speist oben).
+function computeChainOrder(matches){
   const STAGE={R64:0,R48:1,R32:2,R24:3,R16:4,QF:5,SF:6,F1:7};
   const present={};
   matches.forEach(m=>{ if(m.rc in STAGE){(present[m.rc]=present[m.rc]||[]).push(m);} });
@@ -932,7 +976,7 @@ function renderBracket(){
   for(let i=order.length-1;i>=0;i--){
     if(present[order[i]].length===need){ chain.unshift(order[i]); need*=2; } else break;
   }
-  if(!chain.length) return '<div class="bkt-note">Für dieses Turnierformat ist keine Baumansicht verfügbar.</div>';
+  if(!chain.length) return null;
   const firstRc=chain[0], firstMs=present[firstRc].slice().sort((a,b)=>a.n-b.n);
   const firstStage=STAGE[firstRc];
   let skipped=order.filter(rc=>STAGE[rc]<firstStage);
@@ -952,12 +996,11 @@ function renderBracket(){
     if(firstMs.every(sf=>feederMatchOf(sf,rc))){ feederRc=rc; break; }
   }
 
-  let cols='';
+  const byRc={};
+  let feederCol=null;
   if(feederRc){
-    const feederCol=firstMs.map(sf=>feederMatchOf(sf,feederRc));  // zeilengleich zu firstMs
-    const fsub=(feederCol.find(m=>m)||{}).rn || feederRc;
-    cols += `<div class="rnd linear"><div class="rlab">Zwischenrunde<br><span class="rsub">${fsub}</span></div><div class="cells">`
-      + feederCol.map(m=>`<div class="cell">${m?bracketBox(m):'<div class="bx empty"></div>'}</div>`).join('') + `</div></div>`;
+    feederCol=firstMs.map(sf=>feederMatchOf(sf,feederRc));  // zeilengleich zu firstMs, kann Luecken haben
+    byRc[feederRc]=feederCol;
     skipped=skipped.filter(rc=>rc!==feederRc);
   }
   // Jede weitere Spine-Runde wird anhand der Zubringer-Codes (fa/fb) zur vorigen Runde
@@ -976,6 +1019,25 @@ function renderBracket(){
   chain.forEach((rc,i)=>{
     const ms = i===0 ? firstMs : orderByFeeders(prevOrdered, present[rc]);
     prevOrdered=ms;
+    byRc[rc]=ms;
+  });
+  return {byRc, feederRc, feederCol, chain, skipped};
+}
+
+function renderBracket(){
+  const {matches}=cur;
+  const info=computeChainOrder(matches);
+  if(!info) return '<div class="bkt-note">Für dieses Turnierformat ist keine Baumansicht verfügbar.</div>';
+  const {byRc, feederRc, feederCol, chain, skipped}=info;
+
+  let cols='';
+  if(feederRc){
+    const fsub=(feederCol.find(m=>m)||{}).rn || feederRc;
+    cols += `<div class="rnd linear"><div class="rlab">Zwischenrunde<br><span class="rsub">${fsub}</span></div><div class="cells">`
+      + feederCol.map(m=>`<div class="cell">${m?bracketBox(m):'<div class="bx empty"></div>'}</div>`).join('') + `</div></div>`;
+  }
+  chain.forEach((rc,i)=>{
+    const ms=byRc[rc];
     const cls = i<chain.length-1 ? 'binary' : '';
     cols += `<div class="rnd ${cls}"><div class="rlab">${roundLabel(rc,ms[0].rn)}</div><div class="cells">`
       + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div></div>`;
@@ -1093,6 +1155,24 @@ function buildSeasonSelect(){
   for(let y=maxY; y>=FIRST_SEASON; y--) opts += `<option value="${y}">${y}</option>`;
   sel.innerHTML = opts;
   sel.value = season;
+}
+
+// ---- Saison-Cache fuer saisonuebergreifendes Head-to-Head ----
+const seasonCache = {};   // Jahr -> geladene data/<jahr>.json
+let allSeasonsLoaded = false, allSeasonsPromise = null;
+function ensureAllSeasonsLoaded(){
+  seasonCache[DATA.season] = DATA;
+  if(allSeasonsPromise) return allSeasonsPromise;
+  const maxY = Math.max(DATA.season, new Date().getFullYear());
+  const years=[]; for(let y=maxY;y>=FIRST_SEASON;y--) years.push(y);
+  allSeasonsPromise = Promise.all(years.map(async y=>{
+    if(seasonCache[y]) return;
+    try{
+      const r=await fetch(`./data/${y}.json`,{cache:'force-cache'});
+      if(r.ok) seasonCache[y]=await r.json();
+    }catch(e){ /* einzelne Saison nicht erreichbar — Rest zaehlt trotzdem */ }
+  })).then(()=>{ allSeasonsLoaded=true; });
+  return allSeasonsPromise;
 }
 
 // ---- Daten laden / aktualisieren ----
