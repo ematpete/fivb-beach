@@ -451,10 +451,12 @@
       <button class="chip" data-status="upcoming" aria-pressed="false">Kommend</button>
       <button class="chip sep" data-results="1" aria-pressed="false">★ Mit Ergebnissen</button>
     </div>
-    <div class="chips" id="tierChips" role="group" aria-label="Stufe (FIVB)">
+    <div class="chips" id="tierChips" role="group" aria-label="Stufe">
       <button class="chip" data-tier="Elite" aria-pressed="true">Elite</button>
       <button class="chip" data-tier="Challenge" aria-pressed="true">Challenge</button>
       <button class="chip" data-tier="Futures" aria-pressed="false">Futures</button>
+      <button class="chip sep" data-tier="Nations Cup" aria-pressed="false">Nations Cup</button>
+      <button class="chip" data-tier="CEV Tour" aria-pressed="false">CEV Tour</button>
     </div>
   </div>
 
@@ -554,10 +556,11 @@ function eventResultNo(ev){
 
 // State
 const state={q:'',org:'all',status:'all',onlyResults:false,
-  tiers:{Elite:true,Challenge:true,Futures:false}};
-// FIVB-Tier eines Events der Filter-Gruppe zuordnen (Elite16 zaehlt zu "Elite"); alles andere
-// (CEV, Legacy-Tour, Finals/"Event") ist von diesem Filter nicht betroffen
-const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite' : (t==='Challenge'||t==='Futures') ? t : null;
+  tiers:{Elite:true,Challenge:true,Futures:false,'Nations Cup':false,'CEV Tour':false}};
+// Tier eines Events der Filter-Gruppe zuordnen (Elite16 zaehlt zu "Elite"); alles andere
+// (EuroBeach, EM, Legacy-Tour, Finals/"Event") ist von diesem Filter nicht betroffen
+const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite'
+  : (t==='Challenge'||t==='Futures'||t==='Nations Cup'||t==='CEV Tour') ? t : null;
 
 // Stats
 function renderStats(){
