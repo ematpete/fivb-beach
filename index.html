@@ -132,6 +132,18 @@
   .status .pulse{width:7px;height:7px;border-radius:50%;background:currentColor;
     box-shadow:0 0 0 0 currentColor;animation:pulse 1.6s infinite;}
   @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,#fff 60%,transparent);}70%{box-shadow:0 0 0 6px transparent;}100%{box-shadow:0 0 0 0 transparent;}}
+  /* laufende Matches: Zwischenstand deutlich von einem Endergebnis abgesetzt */
+  .livechip{display:inline-flex;align-self:flex-start;align-items:center;gap:5px;font-family:var(--mono);
+    font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#fff;
+    background:var(--green);padding:2px 7px;border-radius:999px;margin-bottom:4px;}
+  .livechip .pulse{width:6px;height:6px;border-radius:50%;background:#fff;
+    box-shadow:0 0 0 0 #fff;animation:pulse 1.6s infinite;}
+  .match.inprogress{background:color-mix(in srgb,var(--green) 6%,transparent);border-radius:8px;}
+  .match .setline .sc.live{color:var(--green);font-weight:700;position:relative;}
+  .mdetail .sk.live,.mdetail .ssc.live{color:var(--green);}
+  .mdetail .ssc.live{font-weight:700;}
+  .bx.live{border-color:color-mix(in srgb,var(--green) 45%,var(--line));}
+  .bx-live{position:absolute;top:-9px;right:9px;margin-bottom:0;}
   .org{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;padding:2px 6px;
     border-radius:5px;border:1px solid var(--line);color:var(--muted);}
   .org.CEV{color:#7C5BD6;border-color:color-mix(in srgb,#7C5BD6 45%,transparent);}
@@ -148,6 +160,18 @@
     .row{grid-template-columns:56px 1fr;}
     .right{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;
       padding-left:62px;margin-top:2px;}
+    header.top{flex-direction:column;align-items:stretch;}
+    .hdr-actions{gap:8px;}
+    .hdr-actions .stand{order:1;flex:1 0 100%;text-align:center;margin-top:2px;}
+    #seasonSel,#refreshbtn,#h2hOpenBtn,#themebtn{flex:1 1 auto;text-align:center;}
+    .h2hpicker{flex-direction:column;align-items:stretch;}
+    .h2hvs{padding-top:0;text-align:center;}
+    .h2hCompare .h2r{grid-template-columns:1fr auto;grid-template-areas:"d s" "c c" "t t";row-gap:2px;}
+    .h2hCompare .h2d{grid-area:d;}
+    .h2hCompare .h2s{grid-area:s;align-self:center;}
+    .h2hCompare .h2c{grid-area:c;}
+    .h2hCompare .h2teams{grid-area:t;white-space:normal;}
+    .mmodal{width:min(94vw,440px)!important;padding:18px 16px 16px;}
   }
   .empty{text-align:center;color:var(--faint);padding:50px 0;font-size:14px;}
 
@@ -231,6 +255,32 @@
   .mmodal .mdetail{margin:0;}
   .pmodal{z-index:90;width:min(400px,92vw);}
   #pscrim{z-index:80;}
+  .h2hmodal{z-index:95;width:min(640px,92vw);}
+  #h2hscrim{z-index:85;}
+  .h2hpicker{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;}
+  .h2hside{flex:1;min-width:0;position:relative;}
+  .h2hside input{width:100%;box-sizing:border-box;font-family:var(--sans);font-size:14px;
+    color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:9px;
+    padding:9px 12px;}
+  .h2hside input:focus{outline:2px solid color-mix(in srgb,var(--water) 45%,transparent);outline-offset:1px;}
+  .h2hvs{font-family:var(--mono);font-size:11px;color:var(--faint);padding-top:11px;flex:0 0 auto;}
+  .h2hSugg{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);
+    border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);
+    max-height:220px;overflow-y:auto;z-index:5;}
+  .h2hSugg:empty{display:none;}
+  .h2hSuggItem{padding:8px 12px;font-size:13.5px;cursor:pointer;color:var(--ink);}
+  .h2hSuggItem:hover,.h2hSuggItem.active{background:var(--surface-2);}
+  .h2hPicked{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    font-size:14px;font-weight:600;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:9px;padding:9px 12px;}
+  .h2hPicked button{background:none;border:none;color:var(--faint);cursor:pointer;font-size:14px;padding:2px;}
+  .h2hPicked button:hover{color:var(--ink);}
+  .h2hNote{color:var(--muted);font-size:13.5px;text-align:center;padding:18px 0;}
+  .h2hCompare .h2bal{justify-content:center;font-size:15px;}
+  .h2hCompare .h2list{max-height:340px;overflow-y:auto;}
+  .h2hCompare .h2r{grid-template-columns:60px 1fr 1fr auto;}
+  .h2hCompare .h2teams{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .h2hCompare .h2s.lead{color:var(--green);}
   /* Seed im Baum */
   .bx .brow .seed{font-family:var(--mono);font-size:9px;color:var(--faint);margin-right:5px;
     vertical-align:middle;}
@@ -370,6 +420,7 @@
     </div>
     <div class="hdr-actions">
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
+      <button class="themebtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Spieler-Vergleich</button>
       <span class="stand" id="stand"></span>
       <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden">⟳ Aktualisieren</button>
       <button class="themebtn" id="themebtn" type="button">◑ Theme</button>
@@ -446,6 +497,24 @@
   <button class="mclose" id="pmClose" type="button" aria-label="Schließen">✕</button>
   <div class="mmhead" id="pmTitle"></div>
   <div id="pmBody"></div>
+</div>
+
+<div class="mscrim" id="h2hscrim"></div>
+<div class="mmodal h2hmodal" id="h2hModal" role="dialog" aria-modal="true" aria-labelledby="h2hModalTitle" aria-hidden="true">
+  <button class="mclose" id="h2hClose" type="button" aria-label="Schließen">✕</button>
+  <div class="mmhead" id="h2hModalTitle">🆚 Spieler-Vergleich</div>
+  <div class="h2hpicker">
+    <div class="h2hside" id="h2hSideA">
+      <input type="search" id="h2hSearchA" placeholder="Spieler:in A suchen …" autocomplete="off">
+      <div class="h2hSugg" id="h2hSuggA"></div>
+    </div>
+    <div class="h2hvs">vs</div>
+    <div class="h2hside" id="h2hSideB">
+      <input type="search" id="h2hSearchB" placeholder="Spieler:in B suchen …" autocomplete="off">
+      <div class="h2hSugg" id="h2hSuggB"></div>
+    </div>
+  </div>
+  <div id="h2hCompareResult"></div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -600,6 +669,8 @@ function roundRank(rc,rn){
 const roundLabel=(rc,rn)=>ROUND_LABEL[rc] || rn || rc || '—';
 
 const played = m => (m.sets && m.sets.length>0) || m.st==='15';
+const isFinished = m => m.st==='15';
+const isLive = m => played(m) && !isFinished(m);
 const fmtDur = s => { if(!s) return ''; const m=Math.floor(s/60), ss=Math.round(s%60);
   return ss ? `${m}:${String(ss).padStart(2,'0')}` : `${m}`; };
 const fed = c => c ? `<span class="fed">${c}</span>` : '';
@@ -624,7 +695,7 @@ function encounters(teamA,teamB){
   for(const sd of Object.values(seasonCache)){
     for(const [tno,ms] of Object.entries(sd.results||{}))
       for(const mm of ms)
-        if(played(mm) && [mm.a,mm.b].sort().join('||')===K)
+        if(isFinished(mm) && [mm.a,mm.b].sort().join('||')===K)
           out.push({mm, city:((sd.venues||{})[tno]||{}).city||''});
   }
   return out;
@@ -663,12 +734,14 @@ function buildPlayerCard(no){
 // Ausführliches Match-Detail: Satz-für-Satz mit Dauer, Zusatzdaten, Head-to-Head
 function buildMatchDetail(m){
   const V = DATA.venues[cur.no] || {};
+  const live = isLive(m);
   const setg = (m.sets||[]).map((s,i)=>{
-    const aw=s[0]>s[1];
-    const scoreA=aw?`${s[0]}`:`<span class="lo">${s[0]}</span>`;
-    const scoreB=!aw?`${s[1]}`:`<span class="lo">${s[1]}</span>`;
-    const dur=(m.d&&m.d[i])?`<div class="sdur">${fmtDur(m.d[i])} min</div>`:`<div class="sdur"></div>`;
-    return `<div class="sk">Satz ${i+1}</div><div class="ssc">${scoreA} : ${scoreB}</div>${dur}`;
+    const curSet = live && i===m.sets.length-1;  // laufender Satz: noch kein Ergebnis, nur Zwischenstand
+    const aw = !curSet && s[0]>s[1];
+    const scoreA = curSet ? `${s[0]}` : (aw ? `${s[0]}` : `<span class="lo">${s[0]}</span>`);
+    const scoreB = curSet ? `${s[1]}` : (!aw ? `${s[1]}` : `<span class="lo">${s[1]}</span>`);
+    const dur=(m.d&&m.d[i])?`<div class="sdur">${fmtDur(m.d[i])} min</div>`:`<div class="sdur">${curSet?'läuft':''}</div>`;
+    return `<div class="sk${curSet?' live':''}">Satz ${i+1}</div><div class="ssc${curSet?' live':''}">${scoreA} : ${scoreB}</div>${dur}`;
   }).join('');
   const totalD=(m.d||[]).reduce((a,x)=>a+(x||0),0);
   const totRow = totalD ? `<div class="sk tot">Spielzeit</div><div class="tot"></div>
@@ -688,7 +761,7 @@ function buildMatchDetail(m){
     m.date ? ['Datum', `${m.date}${m.time?` · ${m.time.slice(0,5)}`:''}`] : null,
     m.ticket ? ['Tickets', `<a class="src" href="${m.ticket}" target="_blank" rel="noopener">Link ↗</a>`] : null,
   ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-  return `<div class="mdhead">${teamPlayers(m,'a')} ${fed(m.ca)} &nbsp;vs&nbsp; ${teamPlayers(m,'b')} ${fed(m.cb)}</div>
+  return `<div class="mdhead">${live?`<span class="livechip"><span class="pulse"></span>Live</span> `:''}${teamPlayers(m,'a')} ${fed(m.ca)} &nbsp;vs&nbsp; ${teamPlayers(m,'b')} ${fed(m.cb)}</div>
     <div class="setgrid">${setg}${totRow}</div>
     <div class="mdmeta">${meta}</div>
     ${buildH2H(m)}`;
@@ -696,9 +769,11 @@ function buildMatchDetail(m){
 // Satzergebnisse für ein Team rendern (side 0=A, 1=B); Gewinnsätze hervorheben
 function setline(m, side){
   if(!m.sets || !m.sets.length) return '';
-  return `<span class="setline">`+m.sets.map(s=>{
-    const mine=s[side], other=s[side?0:1], win=mine>other;
-    return `<span class="sc${win?' w':''}">${mine}</span>`;
+  const live=isLive(m);
+  return `<span class="setline">`+m.sets.map((s,i)=>{
+    const cur = live && i===m.sets.length-1;   // laufender Satz: noch kein Ergebnis, nur Zwischenstand
+    const mine=s[side], other=s[side?0:1], win=!cur && mine>other;
+    return `<span class="sc${win?' w':''}${cur?' live':''}">${mine}</span>`;
   }).join('')+`</span>`;
 }
 
@@ -803,7 +878,7 @@ document.getElementById('liveBtn').addEventListener('click', refreshLive);
 function updateDrawerContent(){
   const {matches,ev,gender:g,mNo,wNo}=cur;
   const finals=matches.filter(m=>m.rc==='F1');
-  const finalM=finals[0], finalDone=finalM&&played(finalM);
+  const finalM=finals[0], finalDone=finalM&&isFinished(finalM);
   const champ=finalDone ? (+finalM.sa>+finalM.sb?finalM.a:finalM.b) : null;
   const bracketOK = finals.length===1 && matches.some(m=>m.rc==='QF'||m.rc==='SF');
 
@@ -885,7 +960,7 @@ function poolStandings(rm){
   const teams={};
   const get=t=>teams[t] || (teams[t]={name:t,w:0,l:0,sw:0,sl:0,pw:0,pl:0});
   for(const m of rm){
-    if(!played(m)) continue;
+    if(!isFinished(m)) continue;
     const A=get(m.a), B=get(m.b), aWin=+m.sa>+m.sb;
     if(aWin){A.w++; B.l++;} else {B.w++; A.l++;}
     A.sw+=+m.sa; A.sl+=+m.sb; B.sw+=+m.sb; B.sl+=+m.sa;
@@ -938,12 +1013,14 @@ function renderList(){
         </div>`;
         continue;
       }
-      const aWin=+m.sa>+m.sb;
-      body += `<div class="match expandable" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
+      const live=isLive(m), aWin=!live && +m.sa>+m.sb;
+      const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
+      body += `<div class="match expandable${live?' inprogress':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
         <div class="mt">${time||'—'}</div>
         <div class="teams">
+          ${liveTag}
           <div class="team ${aWin?'win':''}"><span class="tn">${m.a||'—'}</span>${setline(m,0)}<span class="pt">${m.sa}</span></div>
-          <div class="team ${!aWin?'win':''}"><span class="tn">${m.b||'—'}</span>${setline(m,1)}<span class="pt">${m.sb}</span></div>
+          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${m.b||'—'}</span>${setline(m,1)}<span class="pt">${m.sb}</span></div>
         </div>
         <span class="mchev">›</span>
       </div>
@@ -954,13 +1031,14 @@ function renderList(){
 }
 
 function bracketBox(m){
-  const done=played(m);
+  const done=played(m), live=isLive(m);
   const A=slotInfo(m,'a'), B=slotInfo(m,'b');
-  const aWin=done && +m.sa>+m.sb, bWin=done && +m.sb>+m.sa;
+  const aWin=done && !live && +m.sa>+m.sb, bWin=done && !live && +m.sb>+m.sa;
   const brow=(S,win,score,seed)=>`<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="Aus ${S.roundlab}: ${S.sub}"`:''}>
     <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${S.name}</span><span class="bs">${done?score:''}</span></div>`;
   const clk = done ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="Match-Details ${m.a} gegen ${m.b}` : '';
-  return `<div class="bx ${done?'done':''}${clk}"><span class="bmatchno">#${m.n}</span>
+  const tag = live ? `<span class="livechip bx-live"><span class="pulse"></span>Live</span>` : '';
+  return `<div class="bx ${done?'done':''}${live?' live':''}${clk}">${tag}<span class="bmatchno">#${m.n}</span>
     ${brow(A,aWin,m.sa,m.sda)}${brow(B,bWin,m.sb,m.sdb)}</div>`;
 }
 
@@ -1058,6 +1136,7 @@ document.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
   if(pmodal.classList.contains('open')) closePlayerCard();
   else if(mmodal.classList.contains('open')) closeMatchModal();
+  else if(h2hModal.classList.contains('open')) closeH2HCompare();
   else closeDrawer();
 });
 document.getElementById('vtoggle').addEventListener('click',e=>{
@@ -1108,6 +1187,107 @@ document.addEventListener('keydown',e=>{
   if(e.key!=='Enter' && e.key!==' ') return;
   const pl=e.target.closest('.plink'); if(pl){ e.preventDefault(); openPlayerCard(pl.dataset.p); }
 });
+
+// ---- Spieler-Vergleich: Head-to-Head zweier Einzelspieler:innen, unabhaengig vom Team ----
+const h2hScrim=document.getElementById('h2hscrim'), h2hModal=document.getElementById('h2hModal');
+let h2hPickA=null, h2hPickB=null, h2hPlayerIndex=null;
+function buildPlayerIndex(){
+  const idx={};
+  for(const sd of Object.values(seasonCache))
+    for(const [no,p] of Object.entries(sd.players||{}))
+      if(!idx[no]) idx[no]=p;
+  return idx;
+}
+const playerLabel = p => `${p.fn||''} ${p.ln||''}`.trim() || '—';
+function personalEncounters(noA,noB){
+  const out=[];
+  for(const sd of Object.values(seasonCache)){
+    for(const [tno,ms] of Object.entries(sd.results||{})){
+      for(const m of ms){
+        if(!isFinished(m)) continue;
+        const pa=(m.pa||[]).map(String), pb=(m.pb||[]).map(String);
+        const sideOf = no => pa.includes(no) ? 'a' : (pb.includes(no) ? 'b' : null);
+        const aSide=sideOf(noA), bSide=sideOf(noB);
+        if(!aSide || !bSide || aSide===bSide) continue;  // beide dabei, aber auf verschiedenen Seiten
+        out.push({m, city:((sd.venues||{})[tno]||{}).city||'', aSide});
+      }
+    }
+  }
+  return out;
+}
+function renderH2HCompareResult(){
+  const box=document.getElementById('h2hCompareResult');
+  if(!h2hPickA || !h2hPickB){ box.innerHTML=''; return; }
+  if(!allSeasonsLoaded){
+    box.innerHTML='<p class="h2hNote">Lädt Spieldaten aller Saisonen …</p>';
+    ensureAllSeasonsLoaded().then(()=>{ if(h2hPickA&&h2hPickB) renderH2HCompareResult(); });
+    return;
+  }
+  const enc=personalEncounters(h2hPickA.no,h2hPickB.no);
+  if(!enc.length){
+    box.innerHTML='<p class="h2hNote">Keine gemeinsamen Matches in den geladenen Saisonen (2013–heute) gefunden.</p>';
+    return;
+  }
+  let wa=0,wb=0;
+  const rows=enc.sort((x,y)=>(x.m.date||'').localeCompare(y.m.date||''))
+    .map(({m,city,aSide})=>{
+      const aWon=(+m.sa>+m.sb)===(aSide==='a');
+      if(aWon) wa++; else wb++;
+      const teamA=aSide==='a'?m.a:m.b, teamB=aSide==='a'?m.b:m.a;
+      const scoreA=aSide==='a'?`${m.sa}:${m.sb}`:`${m.sb}:${m.sa}`;
+      return `<div class="h2r"><span class="h2d">${m.date||''}</span>
+        <span class="h2c">${city} · ${roundLabel(m.rc,m.rn)}</span>
+        <span class="h2teams">${teamA} – ${teamB}</span>
+        <span class="h2s${aWon?' lead':''}">${scoreA}</span></div>`;
+    }).join('');
+  box.innerHTML=`<div class="h2hCompare"><div class="h2bal"><span class="${wa>=wb?'lead':''}">${playerLabel(h2hPickA)} · ${wa}</span>
+      <span class="h2dash">–</span><span class="${wb>wa?'lead':''}">${wb} · ${playerLabel(h2hPickB)}</span></div>
+    <div class="h2list">${rows}</div></div>`;
+}
+function h2hPickedHtml(p,onClearId){
+  return `<div class="h2hPicked">${playerLabel(p)} ${fed(p.fed)}<button type="button" id="${onClearId}" aria-label="Auswahl zurücksetzen">✕</button></div>`;
+}
+function wireH2HSearch(side){
+  const input=document.getElementById(`h2hSearch${side}`), sugg=document.getElementById(`h2hSugg${side}`);
+  input.addEventListener('input',()=>{
+    const q=input.value.trim().toLowerCase();
+    if(q.length<2 || !h2hPlayerIndex){ sugg.innerHTML=''; return; }
+    const other = side==='A' ? h2hPickB : h2hPickA;
+    const hits=Object.entries(h2hPlayerIndex)
+      .filter(([no,p])=> (!other||other.no!==no) && `${p.fn||''} ${p.ln||''}`.toLowerCase().includes(q))
+      .slice(0,8);
+    sugg.innerHTML=hits.map(([no,p])=>
+      `<div class="h2hSuggItem" data-no="${no}">${playerLabel(p)} ${p.fed?`(${p.fed})`:''}</div>`).join('');
+  });
+  sugg.addEventListener('click',e=>{
+    const it=e.target.closest('.h2hSuggItem'); if(!it) return;
+    const no=it.dataset.no, p={no,...h2hPlayerIndex[no]};
+    if(side==='A') h2hPickA=p; else h2hPickB=p;
+    const wrap=document.getElementById(`h2hSide${side}`);
+    input.value=''; sugg.innerHTML=''; input.hidden=true;
+    const clearId=`h2hClear${side}`;
+    wrap.querySelector('.h2hPicked')?.remove();
+    wrap.insertAdjacentHTML('beforeend', h2hPickedHtml(p,clearId));
+    document.getElementById(clearId).addEventListener('click',()=>{
+      if(side==='A') h2hPickA=null; else h2hPickB=null;
+      wrap.querySelector('.h2hPicked')?.remove();
+      input.hidden=false; input.focus();
+      renderH2HCompareResult();
+    });
+    renderH2HCompareResult();
+  });
+}
+wireH2HSearch('A'); wireH2HSearch('B');
+function openH2HCompare(){
+  h2hPlayerIndex = buildPlayerIndex();
+  ensureAllSeasonsLoaded().then(()=>{ h2hPlayerIndex=buildPlayerIndex(); });
+  h2hScrim.classList.add('open'); h2hModal.classList.add('open'); h2hModal.setAttribute('aria-hidden','false');
+  document.getElementById('h2hSearchA').focus();
+}
+function closeH2HCompare(){ h2hScrim.classList.remove('open'); h2hModal.classList.remove('open'); h2hModal.setAttribute('aria-hidden','true'); }
+document.getElementById('h2hOpenBtn').addEventListener('click', openH2HCompare);
+h2hScrim.addEventListener('click',closeH2HCompare);
+document.getElementById('h2hClose').addEventListener('click',closeH2HCompare);
 
 document.getElementById('dBody').addEventListener('click',e=>{
   const box=e.target.closest('.bx.clickable'); if(box){ openMatchModal(box.dataset.n); return; }
