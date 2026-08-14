@@ -451,6 +451,11 @@
       <button class="chip" data-status="upcoming" aria-pressed="false">Kommend</button>
       <button class="chip sep" data-results="1" aria-pressed="false">★ Mit Ergebnissen</button>
     </div>
+    <div class="chips" id="tierChips" role="group" aria-label="Stufe (FIVB)">
+      <button class="chip" data-tier="Elite" aria-pressed="true">Elite</button>
+      <button class="chip" data-tier="Challenge" aria-pressed="true">Challenge</button>
+      <button class="chip" data-tier="Futures" aria-pressed="false">Futures</button>
+    </div>
   </div>
 
   <div id="list" class="list"></div>
@@ -548,7 +553,11 @@ function eventResultNo(ev){
 }
 
 // State
-const state={q:'',org:'all',status:'all',onlyResults:false};
+const state={q:'',org:'all',status:'all',onlyResults:false,
+  tiers:{Elite:true,Challenge:true,Futures:false}};
+// FIVB-Tier eines Events der Filter-Gruppe zuordnen (Elite16 zaehlt zu "Elite"); alles andere
+// (CEV, Legacy-Tour, Finals/"Event") ist von diesem Filter nicht betroffen
+const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite' : (t==='Challenge'||t==='Futures') ? t : null;
 
 // Stats
 function renderStats(){
@@ -601,6 +610,10 @@ function render(){
     if(state.onlyResults && !eventResultNo(e)) return false;
     if(q && !(e.city.toLowerCase().includes(q) || country(e.country).toLowerCase().includes(q)
         || e.tier.toLowerCase().includes(q))) return false;
+    if(e.status!=='live'){   // laufende Turniere immer zeigen, unabhaengig vom Stufen-Filter
+      const grp=tierGroup(e.tier);
+      if(grp && !state.tiers[grp]) return false;
+    }
     return true;
   });
   document.getElementById('empty').hidden = ev.length>0;
@@ -1321,6 +1334,14 @@ function wireChips(id,key,attr){
 }
 wireChips('orgChips','org','org');
 wireChips('statusChips','status','status');
+// Stufen-Filter: unabhaengige Toggles (kein Radio-Verhalten wie bei den anderen Chip-Gruppen)
+document.getElementById('tierChips').addEventListener('click',e=>{
+  const b=e.target.closest('.chip'); if(!b) return;
+  const t=b.dataset.tier;
+  state.tiers[t]=!state.tiers[t];
+  b.setAttribute('aria-pressed', state.tiers[t]);
+  render();
+});
 
 // Theme toggle
 document.getElementById('themebtn').addEventListener('click',()=>{
