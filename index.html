@@ -37,6 +37,10 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
     line-height:1.5;-webkit-font-smoothing:antialiased;}
   .wrap{max-width:960px;margin:0 auto;padding:clamp(18px,4vw,40px) clamp(16px,4vw,28px) 80px;}
+  @media (min-width:1280px){
+    .wrap{max-width:1180px;}
+    body{zoom:1.12;}
+  }
 
   /* Header */
   header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
@@ -158,6 +162,12 @@
   .drawer.wide{width:min(1080px,100%);}
   .drawer h2{margin:0 0 4px;font-size:22px;letter-spacing:-.01em;}
   .drawer .dmeta{font-family:var(--mono);font-size:12px;color:var(--muted);}
+  .dmeta-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+  .livebtn{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--water);
+    background:var(--surface);border:1px solid color-mix(in srgb,var(--water) 35%,var(--line));
+    border-radius:8px;padding:3px 9px;cursor:pointer;letter-spacing:.03em;}
+  .livebtn:hover:not(:disabled){background:color-mix(in srgb,var(--water) 10%,transparent);}
+  .livebtn:disabled{opacity:.6;cursor:default;}
   .vtoggle{display:inline-flex;margin-top:12px;background:var(--surface-2);border:1px solid var(--line);
     border-radius:9px;padding:3px;gap:3px;}
   .vt{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);background:none;
@@ -276,6 +286,14 @@
   .dsub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
     color:var(--faint);margin:16px 0 6px;display:flex;align-items:center;gap:8px;}
   .dsub .pooltick{width:9px;height:9px;border-radius:3px;}
+  .standings{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:12.5px;}
+  .standings th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--faint);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--line);}
+  .standings th.n,.standings td.n{text-align:right;}
+  .standings td{padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
+  .standings tr:last-child td{border-bottom:none;}
+  .standings td.pos{color:var(--faint);font-family:var(--mono);width:16px;}
+  .standings td.nm{font-weight:600;}
   .match{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center;
     padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
   .match:last-child{border-bottom:none;}
@@ -393,7 +411,10 @@
   <header>
     <button class="dclose" id="dclose" type="button" aria-label="Schließen">✕</button>
     <h2 id="dTitle"></h2>
-    <div class="dmeta" id="dMeta"></div>
+    <div class="dmeta-row">
+      <div class="dmeta" id="dMeta"></div>
+      <button class="livebtn" id="liveBtn" type="button" title="Aktuellste Ergebnisse direkt von der FIVB-Quelle laden (umgeht den stündlichen Cache)">⟳ Live</button>
+    </div>
     <div class="vtoggle" id="vtoggle" role="group" aria-label="Ansicht">
       <button class="vt" data-view="list" type="button" aria-pressed="true">☰ Liste</button>
       <button class="vt" data-view="bracket" type="button" aria-pressed="false">⑃ Baum</button>
@@ -679,6 +700,81 @@ const slotText = S => S.feeder
 
 let cur=null, drawerView='list';
 
+// Direktabruf beim FIVB VIS (CORS-offen) — umgeht den bis zu 20-minütigen Cache von data/<jahr>.json,
+// baut dieselbe Match-Struktur wie generate.py's get_matches() nach.
+const LIVE_MATCH_FIELDS = "NoInTournament TeamAName TeamBName MatchPointsA MatchPointsB LocalDate LocalTime Status "
+  +"RoundName RoundCode TeamAType TeamBType Court Venue City "
+  +"TeamAFederationCode TeamBFederationCode TeamAPositionInMainDraw TeamBPositionInMainDraw "
+  +"Referee1Name Referee1FederationCode Referee2Name Referee2FederationCode "
+  +"DurationSet1 DurationSet2 DurationSet3 Temperature Humidity NbSpectators "
+  +"BeginDateTimeUtc EndDateTimeUtc LiveStreamUri BuyTicketsUrl "
+  +"FastestServeTeamAPlayer1 FastestServeTeamAPlayer2 FastestServeTeamBPlayer1 FastestServeTeamBPlayer2 "
+  +"NoPlayerA1 NoPlayerA2 NoPlayerB1 NoPlayerB2 "
+  +"PointsTeamASet1 PointsTeamBSet1 PointsTeamASet2 PointsTeamBSet2 PointsTeamASet3 PointsTeamBSet3";
+const numL = x => { const n=parseInt(x,10); return Number.isFinite(n) ? n : null; };
+const feederL = s => { const m=/<(Winner|Loser)\s+NoMatch="(\d+)"/.exec(s||''); return m ? m[1][0]+m[2] : ''; };
+async function fetchLiveMatches(no){
+  const xml=`<Request Type='GetBeachMatchList' Fields='${LIVE_MATCH_FIELDS}'><Filter NoTournament='${no}'/></Request>`;
+  const r=await fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',
+    body:new URLSearchParams({Request:xml})});
+  if(!r.ok) throw new Error('VIS request failed');
+  const doc=new DOMParser().parseFromString(await r.text(),'application/xml');
+  if(doc.querySelector('parsererror')) throw new Error('VIS XML parse error');
+  const out=[];
+  for(const el of doc.getElementsByTagName('BeachMatch')){
+    const g=n=>el.getAttribute(n);
+    const sets=[], durs=[];
+    for(const i of [1,2,3]){
+      const x=g(`PointsTeamASet${i}`), y=g(`PointsTeamBSet${i}`);
+      if(x!==null && x!=='' && y!==null && y!==''){ sets.push([+x,+y]); durs.push(numL(g(`DurationSet${i}`))); }
+    }
+    const refs=[];
+    for(const i of [1,2]){ const rn=g(`Referee${i}Name`); if(rn) refs.push(`${rn}|${g(`Referee${i}FederationCode`)||''}`); }
+    const rec={
+      n:numL(g('NoInTournament')), date:g('LocalDate')||'', time:g('LocalTime')||'',
+      a:g('TeamAName')||'', b:g('TeamBName')||'', sa:g('MatchPointsA')||'', sb:g('MatchPointsB')||'',
+      rc:g('RoundCode')||'', rn:g('RoundName')||'', st:g('Status')||'',
+      sets, fa:feederL(g('TeamAType')), fb:feederL(g('TeamBType')), d:durs,
+      ca:g('TeamAFederationCode')||'', cb:g('TeamBFederationCode')||'', crt:g('Court')||'',
+      sda:numL(g('TeamAPositionInMainDraw')), sdb:numL(g('TeamBPositionInMainDraw')), rf:refs,
+    };
+    const temp=g('Temperature'); if(temp && temp!=='0') rec.temp=parseFloat(temp);
+    const hum=g('Humidity'); if(hum && hum!=='0') rec.hum=numL(hum);
+    const spec=g('NbSpectators'); if(spec && spec!=='0') rec.spec=numL(spec);
+    const fs=['A1','A2','B1','B2'].map(k=>numL(g(`FastestServeTeam${k[0]}Player${k[1]}`)));
+    if(fs.some(Boolean)) rec.fs=fs;
+    const ticket=g('BuyTicketsUrl'); if(ticket) rec.ticket=ticket;
+    const ub=g('BeginDateTimeUtc'), ue=g('EndDateTimeUtc');
+    if(ub && ue){ rec.ub=ub; rec.ue=ue; }
+    const pa=[numL(g('NoPlayerA1')), numL(g('NoPlayerA2'))], pb=[numL(g('NoPlayerB1')), numL(g('NoPlayerB2'))];
+    if(pa.some(Boolean)) rec.pa=pa;
+    if(pb.some(Boolean)) rec.pb=pb;
+    for(const k of Object.keys(rec)){
+      const v=rec[k];
+      if(v===''||v===null||(Array.isArray(v)&&v.length===0)) delete rec[k];
+    }
+    out.push(rec);
+  }
+  return out;
+}
+async function refreshLive(){
+  const btn=document.getElementById('liveBtn'), {no,city,tier,org}=cur;
+  btn.disabled=true; btn.textContent='⟳ Lädt…';
+  try{
+    const matches=await fetchLiveMatches(no);
+    if(!matches.length) throw new Error('leer');
+    DATA.results[no]=matches;
+    openDrawer(no,city,tier,org);
+    render();
+    flash('Live-Daten direkt von FIVB geladen.');
+  }catch(e){
+    flash('Live-Daten konnten nicht geladen werden (FIVB-Quelle nicht erreichbar).', true);
+  }finally{
+    btn.disabled=false; btn.textContent='⟳ Live';
+  }
+}
+document.getElementById('liveBtn').addEventListener('click', refreshLive);
+
 function openDrawer(no,city,tier,org){
   const matches=DATA.results[no];
   const byN={}; matches.forEach(m=>byN[m.n]=m);
@@ -713,6 +809,29 @@ function setView(v){
   body.scrollTop=0;
 }
 
+// Gruppentabelle einer Pool-Runde: Siege/Niederlagen, Sätze, Bälle (nur gespielte Matches)
+function poolStandings(rm){
+  const teams={};
+  const get=t=>teams[t] || (teams[t]={name:t,w:0,l:0,sw:0,sl:0,pw:0,pl:0});
+  for(const m of rm){
+    if(!played(m)) continue;
+    const A=get(m.a), B=get(m.b), aWin=+m.sa>+m.sb;
+    if(aWin){A.w++; B.l++;} else {B.w++; A.l++;}
+    A.sw+=+m.sa; A.sl+=+m.sb; B.sw+=+m.sb; B.sl+=+m.sa;
+    for(const s of (m.sets||[])){ A.pw+=s[0]; A.pl+=s[1]; B.pw+=s[1]; B.pl+=s[0]; }
+  }
+  return Object.values(teams).sort((x,y)=>
+    y.w-x.w || (y.sw/(y.sl||1))-(x.sw/(x.sl||1)) || (y.pw/(y.pl||1))-(x.pw/(x.pl||1)));
+}
+function renderPoolStandings(rm){
+  const rows=poolStandings(rm);
+  if(!rows.length) return '';
+  const trs=rows.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${r.name||'—'}</td>
+    <td class="n">${r.w}-${r.l}</td><td class="n">${r.sw}:${r.sl}</td><td class="n">${r.pw}:${r.pl}</td></tr>`).join('');
+  return `<table class="standings"><thead><tr><th></th><th>Team</th><th class="n">S</th>
+    <th class="n">Sätze</th><th class="n">Bälle</th></tr></thead><tbody>${trs}</tbody></table>`;
+}
+
 function renderList(){
   const {matches}=cur;
   const codes=[...new Set(matches.map(m=>m.rc))].map(rc=>{
@@ -730,6 +849,7 @@ function renderList(){
     }
     const tick = isPool(rc) ? `<span class="pooltick" style="background:${POOL_COLORS[(rc.charCodeAt(1)-65)%POOL_COLORS.length]}"></span>` : '';
     body += `<div class="dsub">${tick}${roundLabel(rc,rn)}</div>`;
+    if(isPool(rc)) body += renderPoolStandings(rm);
     for(const m of rm){
       const time=(m.time||'').slice(0,5);
       if(!played(m)){
@@ -896,7 +1016,7 @@ document.getElementById('q').addEventListener('input',e=>{state.q=e.target.value
 function wireChips(id,key,attr){
   document.getElementById(id).addEventListener('click',e=>{
     const b=e.target.closest('.chip'); if(!b)return;
-    if(attr==='results'){ // toggle
+    if(b.dataset.results){ // toggle
       state.onlyResults=!state.onlyResults; b.setAttribute('aria-pressed',state.onlyResults);
       render(); return;
     }
