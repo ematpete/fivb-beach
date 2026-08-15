@@ -381,6 +381,7 @@
   .standings td.nm{font-weight:600;}
   .standings td.entry{color:var(--faint);font-size:11.5px;}
   .standings td.seedres.champ{color:var(--gold);font-weight:700;}
+  .standings td.seedres.bronze{color:var(--gold);font-weight:600;}
   .standings td.seedres.active{color:var(--green);font-weight:600;}
   .standings td.seedres.out{color:var(--faint);}
   .poolstat{margin-right:5px;font-size:9px;}
@@ -465,7 +466,7 @@
     </div>
     <div class="hdr-actions">
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
-      <button class="themebtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Spieler-Vergleich</button>
+      <button class="themebtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
       <span class="stand" id="stand"></span>
       <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden">⟳ Aktualisieren</button>
       <button class="themebtn" id="themebtn" type="button">◑ Theme</button>
@@ -551,7 +552,7 @@
 <div class="mscrim" id="h2hscrim"></div>
 <div class="mmodal h2hmodal" id="h2hModal" role="dialog" aria-modal="true" aria-labelledby="h2hModalTitle" aria-hidden="true">
   <button class="mclose" id="h2hClose" type="button" aria-label="Schließen">✕</button>
-  <div class="mmhead" id="h2hModalTitle">🆚 Spieler-Vergleich</div>
+  <div class="mmhead" id="h2hModalTitle">🆚 Head to Head</div>
   <div class="h2hpicker">
     <div class="h2hside" id="h2hSideA">
       <input type="search" id="h2hSearchA" placeholder="Spieler:in A suchen …" autocomplete="off">
@@ -1090,11 +1091,18 @@ function derivedRanking(matches){
   const rows=buildSeedList(matches).filter(t=>t.result!=='noch nicht gestartet');
   const champ=rows.filter(t=>t.cls==='champ');
   const active=rows.filter(t=>t.cls==='active');
-  const out=rows.filter(t=>t.cls==='out');
+  const placeable=rows.filter(t=>t.cls==='out'||t.cls==='bronze');
+  // Reine Gruppenphasen-Ausscheider teilen sich einen Platz unabhaengig von der Pool-Buchstaben
+  // (sonst z.B. "25.","26.","27." statt einheitlich "25."). Bronze-Gewinner (Platz 3) sortieren
+  // knapp vor den Verlierern desselben Spiel-um-Platz-3-Matches, die sonst denselben bestRank
+  // haetten und faelschlich mit ihnen verbunden wuerden.
+  const groupKey = t => t.cls==='bronze' ? t.bestRank-0.5
+    : (t.bestRank>=2000 && t.bestRank<3000) ? 2000 : t.bestRank;
   const groups=new Map();
-  for(const t of out){
-    if(!groups.has(t.bestRank)) groups.set(t.bestRank,[]);
-    groups.get(t.bestRank).push(t);
+  for(const t of placeable){
+    const k=groupKey(t);
+    if(!groups.has(k)) groups.set(k,[]);
+    groups.get(k).push(t);
   }
   const placedOut=[];
   let placedCount=0;
@@ -1102,7 +1110,7 @@ function derivedRanking(matches){
     const grp=groups.get(k);
     // noch aktive Teams, die bereits mindestens so tief stehen wie diese Gruppe,
     // landen garantiert vor ihr — auch wenn ihr Endplatz selbst noch offen ist.
-    const betterActive=active.filter(t=>t.bestRank<=k).length;
+    const betterActive=active.filter(t=>groupKey(t)<=k).length;
     const place=champ.length+betterActive+placedCount+1;
     for(const t of grp) placedOut.push({...t, place});
     placedCount+=grp.length;
@@ -1486,7 +1494,10 @@ function buildSeedList(matches){
     if(best){
       const {m,side}=best;
       const won = side==='a' ? (+m.sa>+m.sb) : (+m.sb>+m.sa);
+      // Finale und Spiel um Platz 3 sind Endstationen — Sieg dort bedeutet nicht "geht weiter",
+      // sondern Turnierende mit Platzierung (1./3.), genau wie eine Niederlage dort (2./4.).
       if(won && m.rc==='F1'){ result='Champion'; cls='champ'; }
+      else if(won && (m.rc==='F3'||m.rc==='BM')){ result='Bronze (3. Platz)'; cls='bronze'; }
       else if(!won){ result=`Aus: ${roundLabel(m.rc,m.rn)}`; cls='out'; }
       else { result='noch im Turnier'; cls='active'; }
     }
