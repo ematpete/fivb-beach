@@ -626,11 +626,11 @@ function dualTime(date, time, offsetMin, compact){
   if(isNaN(localAsUtc)) return hhmm;
   const userTime=new Date(localAsUtc-offsetMin*60000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
   // Bei Abweichung immer beide Zeiten sichtbar machen (nicht nur im Tooltip, der auf dem
-  // Handy nicht auffindbar ist) — kompakt gestapelt mit Pin-Symbol fuer die Ortszeit,
-  // damit auch in schmalen Spalten klar ist, welche Zeit welche ist.
+  // Handy nicht auffindbar ist) — und BEIDE explizit beschriften ("Du"/"Ort"), damit nie
+  // Zweifel aufkommt, welche Zeit welche ist (reine Symbole/Klammern reichten nicht).
   return compact
-    ? `<span class="t-user">${userTime}</span><span class="t-venue">📍${hhmm}</span>`
-    : `<span class="t-user">${userTime}</span> <span class="tz-note">(📍${hhmm} Ortszeit)</span>`;
+    ? `<span class="t-user">Du ${userTime}</span><span class="t-venue">Ort ${hhmm}</span>`
+    : `<span class="t-user">Deine Zeit: ${userTime}</span> <span class="tz-note">(Ortszeit: ${hhmm})</span>`;
 }
 function nextUpMatches(ev, limit=2){
   const out=[];
