@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%90%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23EC5231'/%3E%3Ccircle cx='50' cy='50' r='36' fill='%23fff'/%3E%3Cpath d='M15 50 A35 35 0 0 1 85 50' fill='none' stroke='%23EC5231' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E">
 <title>Beach Volleyball 2026 — Kalender & Ergebnisse (FIVB & CEV)</title>
 <style>
   :root{
@@ -139,6 +139,7 @@
   .livechip{display:inline-flex;align-self:flex-start;align-items:center;gap:5px;font-family:var(--mono);
     font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#fff;
     background:var(--green);padding:2px 7px;border-radius:999px;margin-bottom:4px;}
+  .dtitle-live{vertical-align:middle;margin-bottom:3px;}
   .livechip .pulse{width:6px;height:6px;border-radius:50%;background:#fff;
     box-shadow:0 0 0 0 #fff;animation:pulse 1.6s infinite;}
   .match.inprogress{background:color-mix(in srgb,var(--green) 6%,transparent);border-radius:8px;}
@@ -249,7 +250,7 @@
     transition:opacity .18s;z-index:60;}
   .mscrim.open{opacity:1;pointer-events:auto;}
   .mmodal{position:fixed;top:50%;left:50%;transform:translate(-50%,-48%) scale(.98);opacity:0;
-    pointer-events:none;width:min(440px,92vw);max-height:86vh;overflow-y:auto;overscroll-behavior:contain;
+    pointer-events:none;width:min(480px,92vw);max-height:86vh;overflow-y:auto;overscroll-behavior:contain;
     background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.4);
     padding:22px 22px 20px;z-index:70;transition:opacity .18s,transform .18s;}
   .mmodal.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1);}
@@ -261,7 +262,7 @@
   .mmhead b{display:block;font-family:var(--sans);font-size:17px;letter-spacing:-.01em;text-transform:none;
     color:var(--ink);margin-top:4px;}
   .mmodal .mdetail{margin:0;}
-  .pmodal{z-index:90;width:min(400px,92vw);}
+  .pmodal{z-index:90;width:min(430px,92vw);}
   #pscrim{z-index:80;}
   /* overflow:visible statt geerbtem overflow-y:auto: .mmodal wuerde sonst jedes
      ueberstehende Element clippen, auch das absolut positionierte Sugg-Dropdown.
@@ -404,8 +405,11 @@
   .mdetail{margin:0 0 10px 44px;padding:12px 14px;background:var(--surface-2);
     border:1px solid var(--line);border-radius:10px;}
   .mdetail[hidden]{display:none;}
-  .mdetail .mdhead{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;
-    color:var(--muted);margin-bottom:10px;}
+  .mdetail .mdhead{display:flex;flex-direction:column;gap:4px;font-size:13px;
+    color:var(--ink);margin-bottom:10px;}
+  .mdhead-team{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;}
+  .mdhead-vs{font-family:var(--mono);font-size:10px;color:var(--faint);
+    text-transform:uppercase;letter-spacing:.08em;}
   .fed{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 5px;
     border-radius:4px;border:1px solid var(--line);color:var(--muted);}
   .mdetail .setgrid{display:grid;grid-template-columns:auto 1fr auto;gap:5px 14px;align-items:baseline;
@@ -478,7 +482,6 @@
     </div>
     </div>
     </div>
-  </div>
 
   <div id="list" class="list"></div>
   <p class="empty" id="empty" hidden>Keine Turniere für diese Filter.</p>
@@ -756,7 +759,7 @@ function buildH2H(m){
   if(!enc.length) return '';
   let wa=0,wb=0;
   enc.forEach(({mm})=>{ const w=(+mm.sa>+mm.sb)?mm.a:mm.b; if(w===m.a) wa++; else wb++; });
-  const rows=enc.sort((x,y)=>(x.mm.date||'').localeCompare(y.mm.date||''))
+  const rows=enc.sort((x,y)=>(y.mm.date||'').localeCompare(x.mm.date||''))
     .map(({mm,city})=>`<div class="h2r${mm===m?' cur':''}"><span class="h2d">${mm.date||''}</span>
         <span class="h2c">${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${mm.sa}:${mm.sb}</span></div>`)
     .join('');
@@ -860,7 +863,11 @@ function buildMatchDetail(m){
     m.date ? ['Datum', `${m.date}${m.time?` · ${m.time.slice(0,5)}`:''}`] : null,
     m.ticket ? ['Tickets', `<a class="src" href="${m.ticket}" target="_blank" rel="noopener">Link ↗</a>`] : null,
   ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-  return `<div class="mdhead">${live?`<span class="livechip"><span class="pulse"></span>Live</span> `:''}${teamPlayers(m,'a')} ${fed(m.ca)} &nbsp;vs&nbsp; ${teamPlayers(m,'b')} ${fed(m.cb)}</div>
+  return `<div class="mdhead">${live?`<span class="livechip"><span class="pulse"></span>Live</span>`:''}
+    <div class="mdhead-team">${teamPlayers(m,'a')} ${fed(m.ca)}</div>
+    <div class="mdhead-vs">vs</div>
+    <div class="mdhead-team">${teamPlayers(m,'b')} ${fed(m.cb)}</div>
+  </div>
     <div class="setgrid">${setg}${totRow}</div>
     <div class="mdmeta">${meta}</div>
     ${buildH2H(m)}`;
@@ -1033,7 +1040,8 @@ function updateDrawerContent(){
   const champ=finalDone ? (+finalM.sa>+finalM.sb?finalM.a:finalM.b) : null;
   const bracketOK = finals.length===1 && matches.some(m=>m.rc==='QF'||m.rc==='SF');
 
-  document.getElementById('dTitle').textContent = `${ev.city} — ${g==='M'?'Herren':'Damen'}`;
+  document.getElementById('dTitle').innerHTML = `${ev.city} — ${g==='M'?'Herren':'Damen'}`
+    + (ev.status==='live' ? ` <span class="livechip dtitle-live"><span class="pulse"></span>Live</span>` : '');
   document.getElementById('dMeta').textContent =
     `${ev.org} · ${ev.tier} · ${matches.filter(played).length}/${matches.length} Matches gespielt · ${DATA.season}`;
   document.getElementById('dChamp').innerHTML = champ
@@ -1376,18 +1384,20 @@ function renderBracket(){
     cols += `<div class="rnd linear"><div class="rlab">Zwischenrunde<br><span class="rsub">${fsub}</span></div><div class="cells">`
       + feederCol.map(m=>`<div class="cell">${m?bracketBox(m):'<div class="bx empty"></div>'}</div>`).join('') + `</div></div>`;
   }
-  chain.forEach((rc,i)=>{
-    const ms=byRc[rc];
-    const cls = i<chain.length-1 ? 'binary' : '';
-    cols += `<div class="rnd ${cls}"><div class="rlab">${roundLabel(rc,ms[0].rn)}</div><div class="cells">`
-      + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div></div>`;
-  });
   const bm=matches.find(m=>m.rc==='F3'||m.rc==='BM');
   const bronze = bm ? `<div class="bkt-bronze"><div class="blab">Spiel um Platz 3</div>${bracketBox(bm)}</div>` : '';
+  chain.forEach((rc,i)=>{
+    const ms=byRc[rc];
+    const isLast = i===chain.length-1;
+    const cls = isLast ? '' : 'binary';
+    cols += `<div class="rnd ${cls}"><div class="rlab">${roundLabel(rc,ms[0].rn)}</div><div class="cells">`
+      + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div>`
+      + (isLast ? bronze : '') + `</div>`;
+  });
   const note = skipped.length
     ? `<div class="bkt-note">Weitere Zubringer aus ${skipped.map(rc=>roundLabel(rc)).join(', ')} sind in den Boxen als „Sieger #Nr." vermerkt.</div>`
     : '';
-  return `<div class="bkt-scroll"><div class="bkt">${cols}</div></div>${bronze}${note}`;
+  return `<div class="bkt-scroll"><div class="bkt">${cols}</div></div>${note}`;
 }
 function closeDrawer(){
   stopLivePoll();
@@ -1500,7 +1510,7 @@ function renderH2HCompareResult(){
     return;
   }
   let wa=0,wb=0;
-  const rows=enc.sort((x,y)=>(x.m.date||'').localeCompare(y.m.date||''))
+  const rows=enc.sort((x,y)=>(y.m.date||'').localeCompare(x.m.date||''))
     .map(({m,city,aSide})=>{
       const aWon=(+m.sa>+m.sb)===(aSide==='a');
       if(aWon) wa++; else wb++;
