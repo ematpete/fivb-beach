@@ -1,7 +1,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23EC5231'/%3E%3Ccircle cx='50' cy='50' r='36' fill='%23fff'/%3E%3Cpath d='M15 50 A35 35 0 0 1 85 50' fill='none' stroke='%23EC5231' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23EC5231'/%3E%3Ccircle cx='50' cy='50' r='34' fill='%23fff'/%3E%3Cg fill='none' stroke='%23EC5231' stroke-width='4.5' stroke-linecap='round'%3E%3Cpath d='M50 16 C 66 24, 66 40, 50 50 C 34 60, 34 76, 50 84'/%3E%3Cpath d='M18 42 C 30 34, 46 34, 50 50 C 54 66, 70 66, 82 58'/%3E%3Cpath d='M82 42 C 70 34, 54 34, 50 50 C 46 66, 30 66, 18 58'/%3E%3C/g%3E%3C/svg%3E">
 <title>Beach Volleyball 2026 — Kalender & Ergebnisse (FIVB & CEV)</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#EC5231">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Beach Volleyball">
 <style>
   :root{
     --bg:#F1EEE6; --surface:#FBFAF6; --surface-2:#F5F2EA;
@@ -126,6 +132,7 @@
     border:1px solid var(--line);border-radius:5px;padding:0 4px;flex:0 0 auto;}
   .nextt{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);flex:0 0 auto;}
   .nextteams{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tz-note{color:var(--faint);font-weight:400;}
   .status{font-size:11px;font-weight:600;letter-spacing:.03em;display:inline-flex;align-items:center;gap:6px;
     padding:3px 9px;border-radius:999px;white-space:nowrap;}
   .status.finished{color:var(--muted);background:var(--surface-2);border:1px solid var(--line);}
@@ -378,6 +385,19 @@
   .standings td.seedres.champ{color:var(--gold);font-weight:700;}
   .standings td.seedres.active{color:var(--green);font-weight:600;}
   .standings td.seedres.out{color:var(--faint);}
+  .poolstat{margin-right:5px;font-size:9px;}
+  .poolstat.winner{color:var(--gold);}
+  .poolstat.advance{color:var(--green);}
+  .poolstat.out{color:var(--faint);}
+  .jumplink{display:inline-block;font-family:var(--mono);font-size:11.5px;color:var(--water);
+    text-decoration:none;margin:0 0 12px;cursor:pointer;}
+  .jumplink:hover{text-decoration:underline;}
+  .elim-collapsed{margin-bottom:6px;}
+  .elim-collapsed summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--muted);
+    padding:9px 0;list-style:none;}
+  .elim-collapsed summary::-webkit-details-marker{display:none;}
+  .elim-collapsed summary::before{content:'▸ ';color:var(--faint);}
+  .elim-collapsed[open] summary::before{content:'▾ ';}
   .match{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center;
     padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
   .match:last-child{border-bottom:none;}
@@ -591,6 +611,39 @@ const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite'
   : (t==='Challenge'||t==='Futures'||t==='Nations Cup'||t==='CEV Tour') ? t : null;
 
 // naechste noch nicht gespielte Matches eines laufenden Turniers, Herren+Damen gemischt
+// Ermittelt den UTC-Offset (Minuten) des Austragungsorts aus einem beliebigen Match mit
+// bekannter UTC-Zeit (ub) — gilt fuers ganze Turnier, auch fuer noch nicht gespielte Matches nutzbar.
+function venueOffsetMinutes(matches){
+  for(const m of matches){
+    if(m.ub && m.date && m.time){
+      const localAsUtc=Date.parse(`${m.date}T${m.time}Z`);
+      const trueUtc=Date.parse(m.ub);
+      if(!isNaN(localAsUtc) && !isNaN(trueUtc)){
+        // BeginDateTimeUtc ist der tatsaechliche Anpfiff, nicht die geplante Ansatzzeit —
+        // Matches starten oft ein paar Minuten spaeter. Alle echten Zeitzonen liegen auf
+        // 15-Minuten-Schritten, daher runden wir die Roh-Differenz dorthin.
+        return Math.round((localAsUtc-trueUtc)/60000/15)*15;
+      }
+    }
+  }
+  return null;
+}
+// Uhrzeit des Nutzers voran, Ortszeit in Klammern dahinter — nur wenn sich die Zeitzonen
+// tatsaechlich unterscheiden, sonst bloss die eine Uhrzeit (keine unnoetige Dopplung).
+function dualTime(date, time, offsetMin, compact){
+  const hhmm=(time||'').slice(0,5);
+  if(!hhmm) return '—';
+  if(offsetMin==null) return hhmm;
+  const browserOffset=-new Date().getTimezoneOffset();
+  if(offsetMin===browserOffset) return hhmm;
+  const localAsUtc=Date.parse(`${date}T${time}Z`);
+  if(isNaN(localAsUtc)) return hhmm;
+  const userTime=new Date(localAsUtc-offsetMin*60000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  // kompakt (z. B. "Als Naechstes"): Nutzerzeit + Ortszeit nur als Tooltip, spart Platz
+  return compact
+    ? `<span title="${hhmm} Ortszeit">${userTime}</span>`
+    : `${userTime} <span class="tz-note">(${hhmm} Ortszeit)</span>`;
+}
 function nextUpMatches(ev, limit=2){
   const out=[];
   if(ev.M && DATA.results[ev.M.no]) for(const m of DATA.results[ev.M.no]) if(!played(m)) out.push({m,g:'M'});
@@ -602,11 +655,10 @@ function nextUpHtml(e){
   if(e.status!=='live') return '';
   const next=nextUpMatches(e);
   if(!next.length) return '';
-  const rows=next.map(({m,g})=>{
-    const time=(m.time||'').slice(0,5);
-    return `<div class="nextrow"><span class="nextg">${g}</span><span class="nextt">${time||'—'}</span>
-      <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span></div>`;
-  }).join('');
+  const allMs=[...(e.M&&DATA.results[e.M.no]||[]),...(e.W&&DATA.results[e.W.no]||[])];
+  const offset=venueOffsetMinutes(allMs);
+  const rows=next.map(({m,g})=>`<div class="nextrow"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
+      <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span></div>`).join('');
   return `<div class="nextup"><div class="nextlab">Als Nächstes</div>${rows}</div>`;
 }
 function eventRow(e){
@@ -860,7 +912,7 @@ function buildMatchDetail(m){
     fsMax ? ['Schnellster Aufschlag', `${fsMax} km/h`] : null,
     refs ? ['Schiris', refs] : null,
     seed ? ['Setzung', seed] : null,
-    m.date ? ['Datum', `${m.date}${m.time?` · ${m.time.slice(0,5)}`:''}`] : null,
+    m.date ? ['Datum', `${m.date}${m.time?` · ${dualTime(m.date,m.time,venueOffsetMinutes(cur.matches))}`:''}`] : null,
     m.ticket ? ['Tickets', `<a class="src" href="${m.ticket}" target="_blank" rel="noopener">Link ↗</a>`] : null,
   ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
   return `<div class="mdhead">${live?`<span class="livechip"><span class="pulse"></span>Live</span>`:''}
@@ -995,7 +1047,19 @@ async function fetchTeamRanking(no){
   return rows;
 }
 function renderRankingHtml(rows, matches){
-  if(!rows.length) return '<div class="bkt-note">Für dieses Turnier liegt noch keine Endplatzierung vor.</div>';
+  if(!rows.length){
+    // FIVB veroeffentlicht die offizielle Rank erst, wenn das ganze Turnier fertig ist —
+    // bis dahin aus den Matchdaten ableiten, was schon feststeht (wie bei der Setzliste).
+    const derived=buildSeedList(matches).filter(t=>t.result!=='noch nicht gestartet');
+    if(!derived.length) return '<div class="bkt-note">Für dieses Turnier liegt noch keine Endplatzierung vor.</div>';
+    const rankOf=t=>t.cls==='champ'?-2:t.cls==='active'?-1:t.bestRank;
+    derived.sort((a,b)=>rankOf(a)-rankOf(b));
+    const trs=derived.map(t=>`<tr><td class="pos">${t.seed||'–'}</td><td class="nm">${t.name} ${fed(t.fed)}</td>
+      <td class="seedres ${t.cls}">${t.result}</td></tr>`).join('');
+    return `<table class="standings"><thead><tr><th class="n">Setzung</th><th>Team</th><th>Stand</th></tr></thead>
+      <tbody>${trs}</tbody></table>
+      <p class="bkt-note">Offizielle Endplatzierung von FIVB liegt erst nach Turnierende vor — hier der aus den Ergebnissen abgeleitete Zwischenstand.</p>`;
+  }
   const nameMap={};
   for(const m of matches){
     if(m.pa && m.pa.length===2) nameMap[m.pa.slice().sort().join(',')]=m.a;
@@ -1176,7 +1240,7 @@ function setView(v){
 }
 
 // Gruppentabelle einer Pool-Runde: Siege/Niederlagen, Sätze, Bälle (nur gespielte Matches)
-function poolStandings(rm){
+function poolStandings(rm, allMatches){
   const teams={};
   const get=t=>teams[t] || (teams[t]={name:t,w:0,l:0,sw:0,sl:0,pw:0,pl:0});
   for(const m of rm){
@@ -1186,13 +1250,27 @@ function poolStandings(rm){
     A.sw+=+m.sa; A.sl+=+m.sb; B.sw+=+m.sb; B.sl+=+m.sa;
     for(const s of (m.sets||[])){ A.pw+=s[0]; A.pl+=s[1]; B.pw+=s[1]; B.pl+=s[0]; }
   }
-  return Object.values(teams).sort((x,y)=>
+  const rows=Object.values(teams).sort((x,y)=>
     y.w-x.w || (y.sw/(y.sl||1))-(x.sw/(x.sl||1)) || (y.pw/(y.pl||1))-(x.pw/(x.pl||1)));
+  // Weiter/Ausgeschieden erst zeigen, wenn die Gruppe komplett gespielt ist — sonst koennte
+  // eine Setz-/Satzquotient-Aenderung durch ein spaeteres Match die Reihenfolge noch drehen.
+  // "Weiter" wird direkt aus den Daten abgeleitet (taucht das Team in einem Match ausserhalb
+  // der Gruppenphase auf?), nicht aus einer angenommenen Anzahl Aufsteiger pro Gruppe.
+  if(rm.length && rm.every(isFinished) && allMatches){
+    rows.forEach((r,i)=>{
+      const advances=allMatches.some(m=>(m.a===r.name||m.b===r.name) && macroOf(m.rc,m.rn)!=='group');
+      r.status = advances ? (i===0?'winner':'advance') : 'out';
+    });
+  }
+  return rows;
 }
-function renderPoolStandings(rm){
-  const rows=poolStandings(rm);
+function renderPoolStandings(rm, allMatches){
+  const rows=poolStandings(rm, allMatches);
   if(!rows.length) return '';
-  const trs=rows.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${r.name||'—'}</td>
+  const dot=s=>s==='winner'?'<span class="poolstat winner" title="Gruppensieger">●</span>'
+    :s==='advance'?'<span class="poolstat advance" title="Kommt weiter">●</span>'
+    :s==='out'?'<span class="poolstat out" title="Ausgeschieden">●</span>':'';
+  const trs=rows.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${dot(r.status)}${r.name||'—'}</td>
     <td class="n">${r.w}-${r.l}</td><td class="n">${r.sw}:${r.sl}</td><td class="n">${r.pw}:${r.pl}</td></tr>`).join('');
   return `<table class="standings"><thead><tr><th></th><th>Team</th><th class="n">S</th>
     <th class="n">Sätze</th><th class="n">Bälle</th></tr></thead><tbody>${trs}</tbody></table>`;
@@ -1205,28 +1283,24 @@ function renderList(){
     const rn=(matches.find(m=>m.rc===rc)||{}).rn;
     return {rc,rn,rank:roundRank(rc,rn),macro:macroOf(rc,rn)};
   }).sort((a,b)=>a.rank-b.rank);
+  const rmOf = rc => chainInfo && chainInfo.byRc[rc]
+    ? chainInfo.byRc[rc].filter(Boolean)
+    : matches.filter(m=>m.rc===rc).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
 
-  let body='', curMacro='';
-  for(const {rc,rn,macro} of codes){
-    // KO-Spielbaum-Runden folgen der Zubringer-Reihenfolge (oben speist oben), sonst chronologisch
-    const rm = chainInfo && chainInfo.byRc[rc]
-      ? chainInfo.byRc[rc].filter(Boolean)
-      : matches.filter(m=>m.rc===rc).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
-    if(!rm.length) continue;
-    if(macro!==curMacro){
-      curMacro=macro; const mc=MACRO[macro];
-      body += `<div class="dband ${mc.cls}"><span class="ico"><span>${mc.ico}</span></span>${mc.lab}</div>`;
-    }
+  const renderRound=(rc,rn)=>{
+    const rm=rmOf(rc);
+    if(!rm.length) return '';
+    let out='';
     const tick = isPool(rc) ? `<span class="pooltick" style="background:${POOL_COLORS[(rc.charCodeAt(1)-65)%POOL_COLORS.length]}"></span>` : '';
-    body += `<div class="dsub">${tick}${roundLabel(rc,rn)}</div>`;
-    if(isPool(rc)) body += renderPoolStandings(rm);
+    out += `<div class="dsub">${tick}${roundLabel(rc,rn)}</div>`;
+    if(isPool(rc)) out += renderPoolStandings(rm, matches);
     for(const m of rm){
       const time=(m.time||'').slice(0,5);
       if(!played(m)){
         const A=slotInfo(m,'a'), B=slotInfo(m,'b');
         // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
         const preview = m.a && m.b;
-        body += `<div class="match sched${preview?' expandable':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Head-to-Head ${m.a} gegen ${m.b}"`:''}>
+        out += `<div class="match sched${preview?' expandable':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Head-to-Head ${m.a} gegen ${m.b}"`:''}>
           <div class="mt">${time||'—'}</div>
           <div class="teams">
             <div class="team ${A.feeder?'feeder':''}"><span class="tn">${slotText(A)}</span><span></span><span class="pt">–</span></div>
@@ -1234,12 +1308,12 @@ function renderList(){
           </div>
           ${preview?'<span class="mchev">›</span>':''}
         </div>`;
-        if(preview) body += `<div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
+        if(preview) out += `<div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
         continue;
       }
       const live=isLive(m), aWin=!live && +m.sa>+m.sb;
       const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
-      body += `<div class="match expandable${live?' inprogress':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
+      out += `<div class="match expandable${live?' inprogress':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
         <div class="mt">${time||'—'}</div>
         <div class="teams">
           ${liveTag}
@@ -1250,6 +1324,41 @@ function renderList(){
       </div>
       <div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
     }
+    return out;
+  };
+
+  const hasGroup = codes.some(c=>c.macro==='group');
+  const elimCodes = codes.filter(c=>c.macro==='final'||c.macro==='inter');
+  const elimHasRealTeams = elimCodes.some(({rc})=>rmOf(rc).some(m=>m.a && m.b));
+  const collapseElim = hasGroup && elimCodes.length>0 && !elimHasRealTeams;
+
+  let body='';
+  if(hasGroup){
+    body += `<a href="#" class="jumplink" data-jump="gruppenphase-jump">↓ Zur Gruppenphase</a>`;
+  }
+
+  if(elimCodes.length){
+    let elimBody='', curMacro='';
+    for(const c of elimCodes){
+      if(c.macro!==curMacro){ curMacro=c.macro; const mc=MACRO[c.macro];
+        elimBody += `<div class="dband ${mc.cls}"><span class="ico"><span>${mc.ico}</span></span>${mc.lab}</div>`; }
+      elimBody += renderRound(c.rc,c.rn);
+    }
+    body += collapseElim
+      ? `<details class="elim-collapsed"><summary>Finalphase — Paarungen stehen noch nicht fest</summary>${elimBody}</details>`
+      : elimBody;
+  }
+
+  let curMacro='', firstGroup=true;
+  for(const c of codes){
+    if(c.macro!=='group' && c.macro!=='quali') continue;
+    if(c.macro!==curMacro){
+      curMacro=c.macro; const mc=MACRO[c.macro];
+      const anchor = (c.macro==='group' && firstGroup) ? ' id="gruppenphase-jump"' : '';
+      if(c.macro==='group') firstGroup=false;
+      body += `<div class="dband ${mc.cls}"${anchor}><span class="ico"><span>${mc.ico}</span></span>${mc.lab}</div>`;
+    }
+    body += renderRound(c.rc,c.rn);
   }
   return body;
 }
@@ -1286,7 +1395,7 @@ function buildSeedList(matches){
       else if(!won){ result=`Aus: ${roundLabel(m.rc,m.rn)}`; cls='out'; }
       else { result='noch im Turnier'; cls='active'; }
     }
-    return {...t, result, cls, entry: cameFromQuali ? 'Quali' : 'Hauptfeld'};
+    return {...t, result, cls, entry: cameFromQuali ? 'Quali' : 'Hauptfeld', bestRank};
   });
   rows.sort((a,b)=>(a.seed||999)-(b.seed||999) || a.name.localeCompare(b.name));
   return rows;
@@ -1571,6 +1680,11 @@ h2hScrim.addEventListener('click',closeH2HCompare);
 document.getElementById('h2hClose').addEventListener('click',closeH2HCompare);
 
 document.getElementById('dBody').addEventListener('click',e=>{
+  const jump=e.target.closest('.jumplink');
+  if(jump){ e.preventDefault();
+    document.getElementById('gruppenphase-jump')?.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
   const box=e.target.closest('.bx.clickable'); if(box){ openMatchModal(box.dataset.n); return; }
   const row=e.target.closest('.match.expandable'); if(row) toggleMatch(row);
 });
