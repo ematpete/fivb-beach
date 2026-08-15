@@ -441,7 +441,9 @@
   .mdhead-vs{font-family:var(--mono);font-size:10px;color:var(--faint);
     text-transform:uppercase;letter-spacing:.08em;}
   .fed{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 5px;
-    border-radius:4px;border:1px solid var(--line);color:var(--muted);}
+    border-radius:4px;border:1px solid var(--line);color:var(--muted);
+    display:inline-flex;align-items:center;gap:4px;}
+  .fed .flag{font-size:11px;line-height:1;}
   .mdetail .setgrid{display:grid;grid-template-columns:auto 1fr auto;gap:5px 14px;align-items:baseline;
     font-variant-numeric:tabular-nums;}
   .mdetail .sk{font-family:var(--mono);font-size:11px;color:var(--faint);}
@@ -822,7 +824,38 @@ const isFinished = m => m.st==='15';
 const isLive = m => played(m) && !isFinished(m);
 const fmtDur = s => { if(!s) return ''; const m=Math.floor(s/60), ss=Math.round(s%60);
   return ss ? `${m}:${String(ss).padStart(2,'0')}` : `${m}`; };
-const fed = c => c ? `<span class="fed">${c}</span>` : '';
+// FIVB/IOC-Laendercode (3 Buchstaben) -> ISO-3166-1-alpha-2, fuer Flaggen-Emoji.
+// Deckt alle Codes ab, die in den Daten vorkommen; unbekannte Codes bleiben ohne Flagge.
+const FED_ISO = {
+  ALG:'DZ',ARG:'AR',ARM:'AM',ARU:'AW',AUS:'AU',AUT:'AT',AZE:'AZ',BAH:'BS',BAR:'BB',BDI:'BI',
+  BEL:'BE',BEN:'BJ',BLR:'BY',BOL:'BO',BOT:'BW',BRA:'BR',BUL:'BG',CAM:'KH',CAN:'CA',CAY:'KY',
+  CGO:'CG',CHA:'TD',CHI:'CL',CHN:'CN',CIV:'CI',CMR:'CM',COD:'CD',COK:'CK',COL:'CO',CPV:'CV',
+  CRC:'CR',CRO:'HR',CUB:'CU',CUR:'CW',CYP:'CY',CZE:'CZ',DEN:'DK',DMA:'DM',DOM:'DO',ECU:'EC',
+  EGY:'EG',ESA:'SV',ESP:'ES',EST:'EE',FIN:'FI',FRA:'FR',GAM:'GM',GBR:'GB',GBS:'GW',GER:'DE',
+  GHA:'GH',GRE:'GR',GRN:'GD',GUA:'GT',HKG:'HK',HUN:'HU',INA:'ID',IND:'IN',IRI:'IR',ISL:'IS',
+  ISR:'IL',ISV:'VI',ITA:'IT',JAM:'JM',JPN:'JP',KAZ:'KZ',KEN:'KE',KOR:'KR',KSA:'SA',LAO:'LA',
+  LAT:'LV',LBR:'LR',LCA:'LC',LES:'LS',LIB:'LB',LIE:'LI',LTU:'LT',LUX:'LU',MAC:'MO',MAR:'MA',
+  MAS:'MY',MDV:'MV',MEX:'MX',MLD:'MD',MLI:'ML',MLT:'MT',MON:'MC',MOZ:'MZ',MRI:'MU',NAM:'NA',
+  NCA:'NI',NED:'NL',NGR:'NG',NIG:'NE',NMI:'MP',NOR:'NO',NZL:'NZ',OMA:'OM',PAK:'PK',PAR:'PY',
+  PER:'PE',PHI:'PH',PNG:'PG',POL:'PL',POR:'PT',PUR:'PR',QAT:'QA',ROC:'RU',ROU:'RO',RSA:'ZA',
+  RUS:'RU',RWA:'RW',SEN:'SN',SEY:'SC',SIN:'SG',SKN:'KN',SLE:'SL',SLO:'SI',SRB:'RS',SRI:'LK',
+  STP:'ST',SUD:'SD',SUI:'CH',SUR:'SR',SVK:'SK',SWE:'SE',SXM:'SX',TAN:'TZ',THA:'TH',TOG:'TG',
+  TPE:'TW',TTO:'TT',TUN:'TN',TUR:'TR',TUV:'TV',UAE:'AE',UKR:'UA',URU:'UY',USA:'US',UZB:'UZ',
+  VAN:'VU',VEN:'VE',VIE:'VN',VIN:'VC',ZAM:'ZM',ZIM:'ZW',
+};
+// England/Schottland/Wales haben keinen ISO-Laendercode, sondern eigene
+// Unicode-Subdivision-Flaggen (Tag-Sequenzen) — Nordirland faellt auf den Union Jack zurueck.
+const FED_FLAG_SPECIAL = {ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',SCO:'🏴󠁧󠁢󠁳󠁣󠁴󠁿',WAL:'🏴󠁧󠁢󠁷󠁬󠁳󠁿',NIR:'🇬🇧'};
+const flagEmoji = fedCode => {
+  if(FED_FLAG_SPECIAL[fedCode]) return FED_FLAG_SPECIAL[fedCode];
+  const iso=FED_ISO[fedCode];
+  return iso ? String.fromCodePoint(...[...iso].map(c=>127397+c.charCodeAt(0))) : '';
+};
+const fed = c => {
+  if(!c) return '';
+  const flag=flagEmoji(c);
+  return `<span class="fed">${flag?`<span class="flag">${flag}</span>`:''}${c}</span>`;
+};
 
 const age = bd => { if(!bd) return null; const g=new Date(DATA.generated||'2026-08-13'), b=new Date(bd);
   let a=g.getFullYear()-b.getFullYear();
