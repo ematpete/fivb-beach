@@ -661,21 +661,28 @@ function nextUpHtml(e){
       <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span></div>`).join('');
   return `<div class="nextup"><div class="nextlab">Als Nächstes</div>${rows}</div>`;
 }
-function eventRow(e){
+function eventRow(e, showNextUp){
   const tv=tierColor(e.tier);
   const genders=[e.M?'M':null,e.W?'W':null].filter(Boolean).join(' · ');
-  const rNo=eventResultNo(e);
+  const resNo=eventResultNo(e);
+  // Kommende Turniere haben noch keine gecachten Ergebnisse (daher nicht in resultNos),
+  // aber die Setzliste steht meist schon vor Turnierstart via VIS zur Verfuegung —
+  // Drawer trotzdem oeffenbar machen, mit eigenem Label statt "Ergebnisse".
+  const upcomingNo = !resNo && e.status==='upcoming' ? ((e.M&&e.M.no)||(e.W&&e.W.no)) : null;
+  const rNo = resNo || upcomingNo;
   const st = e.status==='live'
     ? `<span class="status live"><span class="pulse"></span>Live</span>`
     : e.status==='upcoming'
       ? `<span class="status upcoming">Kommend</span>`
       : `<span class="status finished">Gespielt</span>`;
-  const cue = rNo
+  const cue = resNo
     ? `<span class="reslabel">Ergebnisse<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>`
-    : '';
+    : upcomingNo
+      ? `<span class="reslabel">Setzliste<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>`
+      : '';
   return `
     <div class="row ${rNo?'clickable':''}" style="--tier:${tv}"
-      ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="Ergebnisse ${e.city} öffnen"`:''}>
+      ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="${resNo?'Ergebnisse':'Setzliste'} ${e.city} öffnen"`:''}>
       <div class="date">${fmtRange(e.start,e.end)}<b>${e.start.slice(8)}. ${MONTHS[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
       <div class="main">
         <div class="city">${e.city}
@@ -686,7 +693,7 @@ function eventRow(e){
         <div class="country">${country(e.country)}</div>
       </div>
       <div class="right">${st}${cue}</div>
-      ${nextUpHtml(e)}
+      ${showNextUp ? nextUpHtml(e) : ''}
     </div>`;
 }
 
@@ -711,7 +718,7 @@ function render(){
   const liveNow = DATA.events.filter(e=>e.status==='live');
   if(liveNow.length){
     html += `<div class="livepin"><div class="livepin-lab"><span class="pulse"></span>Live jetzt</div>`
-      + `<div class="list">${liveNow.map(eventRow).join('')}</div></div>`;
+      + `<div class="list">${liveNow.map(e=>eventRow(e,true)).join('')}</div></div>`;
   }
   let curMonth='', listOpen=false;
   for(const e of ev){
@@ -1046,17 +1053,41 @@ async function fetchTeamRanking(no){
   rankingCache[no]=rows;
   return rows;
 }
+// Platzierung aus Matchdaten ableiten, solange die offizielle FIVB-Rank noch fehlt:
+// Teams mit gleicher Ausscheidungsrunde teilen sich denselben Platz (wie bei der offiziellen Tabelle,
+// z.B. "5" fuer alle Viertelfinal-Verlierer), statt nur die Setzung anzuzeigen.
+function derivedRanking(matches){
+  const rows=buildSeedList(matches).filter(t=>t.result!=='noch nicht gestartet');
+  const champ=rows.filter(t=>t.cls==='champ');
+  const active=rows.filter(t=>t.cls==='active');
+  const out=rows.filter(t=>t.cls==='out');
+  const groups=new Map();
+  for(const t of out){
+    if(!groups.has(t.bestRank)) groups.set(t.bestRank,[]);
+    groups.get(t.bestRank).push(t);
+  }
+  const placedOut=[];
+  let placedCount=0;
+  for(const k of [...groups.keys()].sort((a,b)=>a-b)){
+    const grp=groups.get(k);
+    // noch aktive Teams, die bereits mindestens so tief stehen wie diese Gruppe,
+    // landen garantiert vor ihr — auch wenn ihr Endplatz selbst noch offen ist.
+    const betterActive=active.filter(t=>t.bestRank<=k).length;
+    const place=champ.length+betterActive+placedCount+1;
+    for(const t of grp) placedOut.push({...t, place});
+    placedCount+=grp.length;
+  }
+  return [...champ.map(t=>({...t, place:1})), ...placedOut, ...active.map(t=>({...t, place:null}))];
+}
 function renderRankingHtml(rows, matches){
   if(!rows.length){
     // FIVB veroeffentlicht die offizielle Rank erst, wenn das ganze Turnier fertig ist —
-    // bis dahin aus den Matchdaten ableiten, was schon feststeht (wie bei der Setzliste).
-    const derived=buildSeedList(matches).filter(t=>t.result!=='noch nicht gestartet');
+    // bis dahin aus den Matchdaten ableiten, was schon feststeht.
+    const derived=derivedRanking(matches);
     if(!derived.length) return '<div class="bkt-note">Für dieses Turnier liegt noch keine Endplatzierung vor.</div>';
-    const rankOf=t=>t.cls==='champ'?-2:t.cls==='active'?-1:t.bestRank;
-    derived.sort((a,b)=>rankOf(a)-rankOf(b));
-    const trs=derived.map(t=>`<tr><td class="pos">${t.seed||'–'}</td><td class="nm">${t.name} ${fed(t.fed)}</td>
+    const trs=derived.map(t=>`<tr><td class="pos">${t.place||'–'}</td><td class="nm">${t.name} ${fed(t.fed)}</td>
       <td class="seedres ${t.cls}">${t.result}</td></tr>`).join('');
-    return `<table class="standings"><thead><tr><th class="n">Setzung</th><th>Team</th><th>Stand</th></tr></thead>
+    return `<table class="standings"><thead><tr><th class="n">Platz</th><th>Team</th><th>Stand</th></tr></thead>
       <tbody>${trs}</tbody></table>
       <p class="bkt-note">Offizielle Endplatzierung von FIVB liegt erst nach Turnierende vor — hier der aus den Ergebnissen abgeleitete Zwischenstand.</p>`;
   }
@@ -1118,7 +1149,7 @@ function updateDrawerContent(){
   gt.querySelectorAll('.vt').forEach(b=>b.setAttribute('aria-pressed', b.dataset.g===g));
 
   document.querySelector('#vtoggle .vt[data-view="bracket"]').hidden = !bracketOK;
-  if(!bracketOK) drawerView='list';
+  if(!bracketOK && drawerView==='bracket') drawerView='list';
 }
 // offene Match-Details vor einem Neu-Render merken und danach wiederherstellen
 function reRenderKeepOpen(){
@@ -1131,13 +1162,16 @@ function reRenderKeepOpen(){
   });
 }
 function openDrawer(ev,gender){
-  const mNo = ev.M && resultNos.has(ev.M.no) ? ev.M.no : null;
-  const wNo = ev.W && resultNos.has(ev.W.no) ? ev.W.no : null;
+  // Kommende Turniere sind noch nicht in resultNos (keine gecachten Ergebnisse), aber
+  // die Setzliste laesst sich per Live-Fetch trotzdem laden — daher hier zulassen.
+  const mNo = ev.M && (resultNos.has(ev.M.no) || ev.status==='upcoming') ? ev.M.no : null;
+  const wNo = ev.W && (resultNos.has(ev.W.no) || ev.status==='upcoming') ? ev.W.no : null;
   const g = (gender==='M'&&mNo) || (gender==='W'&&wNo) ? gender : (mNo ? 'M' : 'W');
   const no = g==='M' ? mNo : wNo;
-  const matches=DATA.results[no];
+  const matches=DATA.results[no] || [];
   const byN={}; matches.forEach(m=>byN[m.n]=m);
   cur={no,city:ev.city,tier:ev.tier,org:ev.org,matches,byN,ev,gender:g,mNo,wNo};
+  if(ev.status==='upcoming') drawerView='seeds';
 
   updateDrawerContent();
   setView(drawerView);
@@ -1156,13 +1190,13 @@ function openDrawer(ev,gender){
   // Laeuft das Turnier gerade, beim Oeffnen still die aktuellsten Ergebnisse direkt von
   // FIVB nachladen — kein Warten auf den stuendlichen Cache oder den Live-Button.
   stopLivePoll();
-  if(ev.status==='live'){
+  if(ev.status==='live' || (ev.status==='upcoming' && !matches.length)){
     fetchLiveMatches(no).then(fresh=>{
       if(!fresh.length || !cur || cur.ev!==ev || cur.no!==no) return;
       DATA.results[no]=fresh; cur.matches=fresh;
       const byN2={}; fresh.forEach(m=>byN2[m.n]=m); cur.byN=byN2;
       reRenderKeepOpen();
-      startLivePoll(ev,no);
+      if(ev.status==='live') startLivePoll(ev,no);
     }).catch(()=>{});
   }
 }
