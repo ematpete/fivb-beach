@@ -602,23 +602,48 @@ const state={q:'',org:'FIVB',tiers:{Elite:true,Challenge:true,Futures:false}};
 const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite'
   : (t==='Challenge'||t==='Futures') ? t : null;
 
-// naechste noch nicht gespielte Matches eines laufenden Turniers, Herren+Damen gemischt
-// Ermittelt den UTC-Offset (Minuten) des Austragungsorts aus einem beliebigen Match mit
-// bekannter UTC-Zeit (ub) — gilt fuers ganze Turnier, auch fuer noch nicht gespielte Matches nutzbar.
-function venueOffsetMinutes(matches){
-  for(const m of matches){
-    if(m.ub && m.date && m.time){
-      const localAsUtc=Date.parse(`${m.date}T${m.time}Z`);
-      const trueUtc=Date.parse(m.ub);
-      if(!isNaN(localAsUtc) && !isNaN(trueUtc)){
-        // BeginDateTimeUtc ist der tatsaechliche Anpfiff, nicht die geplante Ansatzzeit —
-        // Matches starten oft ein paar Minuten spaeter. Alle echten Zeitzonen liegen auf
-        // 15-Minuten-Schritten, daher runden wir die Roh-Differenz dorthin.
-        return Math.round((localAsUtc-trueUtc)/60000/15)*15;
-      }
-    }
-  }
-  return null;
+// Land -> IANA-Zeitzone. Deckt die Laender ab, die im Datensatz vorkommen. Bei Laendern mit
+// mehreren Zeitzonen (USA, Kanada, Australien, Russland, Brasilien, Mexiko …) wird die fuer
+// Beach-Volleyball-Turniere ueblichste Zone verwendet — bei Turnieren in einer anderen Zone
+// desselben Landes kann die angezeigte Ortszeit daher leicht abweichen.
+const COUNTRY_TZ = {
+  'Antigua and Barbuda':'America/Antigua','Argentina':'America/Argentina/Buenos_Aires','Australia':'Australia/Sydney',
+  'Austria':'Europe/Vienna','Azerbaijan':'Asia/Baku','Belgium':'Europe/Brussels','Brazil':'America/Sao_Paulo',
+  'Bulgaria':'Europe/Sofia','Burundi':'Africa/Bujumbura','Cambodia':'Asia/Phnom_Penh','Canada':'America/Toronto',
+  'Cape Verde':'Atlantic/Cape_Verde','Cayman Islands':'America/Cayman','China':'Asia/Shanghai',
+  'Cook Islands':'Pacific/Rarotonga','Costa Rica':'America/Costa_Rica','Croatia':'Europe/Zagreb','Cuba':'America/Havana',
+  'Cyprus':'Asia/Nicosia','Czech Republic':'Europe/Prague','Dominican Republic':'America/Santo_Domingo',
+  'Egypt':'Africa/Cairo','Estonia':'Europe/Tallinn','France':'Europe/Paris','French Polynesia':'Pacific/Tahiti',
+  'Germany':'Europe/Berlin','Great Britain':'Europe/London','Greece':'Europe/Athens','Guatemala':'America/Guatemala',
+  'Hungary':'Europe/Budapest','India':'Asia/Kolkata','Indonesia':'Asia/Jakarta','Iran':'Asia/Tehran',
+  'Italy':'Europe/Rome','Jamaica':'America/Jamaica','Japan':'Asia/Tokyo','Korea':'Asia/Seoul','Latvia':'Europe/Riga',
+  'Malaysia':'Asia/Kuala_Lumpur','Maldives':'Indian/Maldives','Mexico':'America/Mexico_City','Morocco':'Africa/Casablanca',
+  'Netherlands':'Europe/Amsterdam','New Zealand':'Pacific/Auckland','Norway':'Europe/Oslo','Philippines':'Asia/Manila',
+  'Poland':'Europe/Warsaw','Portugal':'Europe/Lisbon','Puerto Rico':'America/Puerto_Rico','Qatar':'Asia/Qatar',
+  'Romania':'Europe/Bucharest','Russia':'Europe/Moscow','Rwanda':'Africa/Kigali','Saint Lucia':'America/St_Lucia',
+  'Saudi Arabia':'Asia/Riyadh','Serbia':'Europe/Belgrade','Singapore':'Asia/Singapore','Slovenia':'Europe/Ljubljana',
+  'South Africa':'Africa/Johannesburg','Spain':'Europe/Madrid','Sri Lanka':'Asia/Colombo','Sweden':'Europe/Stockholm',
+  'Switzerland':'Europe/Zurich','Thailand':'Asia/Bangkok','Türkiye':'Europe/Istanbul','Uganda':'Africa/Kampala',
+  'United Arab Emirates':'Asia/Dubai','United States':'America/New_York','Viet Nam':'Asia/Ho_Chi_Minh',
+};
+// UTC-Offset (Minuten) einer IANA-Zone an einem gegebenen Datum, DST-korrekt via Intl.
+function tzOffsetMinutes(ianaZone, dateStr){
+  try{
+    const d = dateStr ? new Date(`${dateStr}T12:00:00Z`) : new Date();
+    const parts = new Intl.DateTimeFormat('en-US',{timeZone:ianaZone,timeZoneName:'shortOffset'}).formatToParts(d);
+    const tzPart = parts.find(p=>p.type==='timeZoneName');
+    const m = tzPart && /GMT([+-]\d+)(?::(\d+))?/.exec(tzPart.value);
+    if(!m) return null;
+    const h=+m[1], mm=+(m[2]||0);
+    return h*60 + (h<0 ? -mm : mm);
+  }catch(e){ return null; }
+}
+// Ortszeit-Offset (Minuten) eines Turniers ueber Land+Datum — funktioniert auch fuer
+// Turniere ganz ohne gespielte Matches (im Gegensatz zur frueheren Ableitung aus
+// BeginDateTimeUtc, die oft fehlt, besonders vor Turnierstart).
+function venueOffsetMinutes(country, dateStr){
+  const zone=COUNTRY_TZ[country];
+  return zone ? tzOffsetMinutes(zone, dateStr) : null;
 }
 // Uhrzeit des Nutzers voran, Ortszeit in Klammern dahinter — nur wenn sich die Zeitzonen
 // tatsaechlich unterscheiden, sonst bloss die eine Uhrzeit (keine unnoetige Dopplung).
@@ -649,8 +674,7 @@ function nextUpHtml(e){
   if(e.status!=='live') return '';
   const next=nextUpMatches(e);
   if(!next.length) return '';
-  const allMs=[...(e.M&&DATA.results[e.M.no]||[]),...(e.W&&DATA.results[e.W.no]||[])];
-  const offset=venueOffsetMinutes(allMs);
+  const offset=venueOffsetMinutes(e.country, e.start);
   const rows=next.map(({m,g})=>`<div class="nextrow"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
       <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span></div>`).join('');
   return `<div class="nextup"><div class="nextlab">Als Nächstes</div>${rows}</div>`;
@@ -697,11 +721,12 @@ function render(){
   let ev=DATA.events.filter(e=>{
     if(q && !(e.city.toLowerCase().includes(q) || country(e.country).toLowerCase().includes(q)
         || e.tier.toLowerCase().includes(q))) return false;
-    if(e.status!=='live'){   // laufende Turniere immer zeigen, unabhaengig von Verband-/Stufen-Filter
-      if(state.org!=='all' && e.org!==state.org) return false;
-      const grp=tierGroup(e.tier);
-      if(grp && !state.tiers[grp]) return false;
-    }
+    // Verband/Stufe gelten hier wie fuer alle anderen Events — laufende Turniere sind oben
+    // im "Live jetzt"-Pin ohnehin immer sichtbar, sollen aber nicht doppelt auftauchen,
+    // wenn sie durch den aktuellen Filter eigentlich rausfallen wuerden.
+    if(state.org!=='all' && e.org!==state.org) return false;
+    const grp=tierGroup(e.tier);
+    if(grp && !state.tiers[grp]) return false;
     return true;
   });
   document.getElementById('empty').hidden = ev.length>0;
@@ -924,7 +949,7 @@ function buildMatchDetail(m){
     fsMax ? ['Schnellster Aufschlag', `${fsMax} km/h`] : null,
     refs ? ['Schiris', refs] : null,
     seed ? ['Setzung', seed] : null,
-    m.date ? ['Datum', `${m.date}${m.time?` · ${dualTime(m.date,m.time,venueOffsetMinutes(cur.matches))}`:''}`] : null,
+    m.date ? ['Datum', `${m.date}${m.time?` · ${dualTime(m.date,m.time,venueOffsetMinutes(cur.ev.country,m.date))}`:''}`] : null,
     m.ticket ? ['Tickets', `<a class="src" href="${m.ticket}" target="_blank" rel="noopener">Link ↗</a>`] : null,
   ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
   return `<div class="mdhead">${live?`<span class="livechip"><span class="pulse"></span>Live</span>`:''}
@@ -1317,7 +1342,7 @@ function renderPoolStandings(rm, allMatches){
 
 function renderList(){
   const {matches}=cur;
-  const offset=venueOffsetMinutes(matches);
+  const offset=venueOffsetMinutes(cur.ev.country, cur.ev.start);
   const chainInfo=computeChainOrder(matches);
   const codes=[...new Set(matches.map(m=>m.rc))].map(rc=>{
     const rn=(matches.find(m=>m.rc===rc)||{}).rn;
