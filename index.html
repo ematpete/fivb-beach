@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23EC5231'/%3E%3Ccircle cx='50' cy='50' r='34' fill='%23fff'/%3E%3Cg fill='none' stroke='%23EC5231' stroke-width='4.5' stroke-linecap='round'%3E%3Cpath d='M50 16 C 66 24, 66 40, 50 50 C 34 60, 34 76, 50 84'/%3E%3Cpath d='M18 42 C 30 34, 46 34, 50 50 C 54 66, 70 66, 82 58'/%3E%3Cpath d='M82 42 C 70 34, 54 34, 50 50 C 46 66, 30 66, 18 58'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23EC5231'/%3E%3Ccircle cx='50' cy='50' r='34' fill='%23fff'/%3E%3Cg fill='none' stroke='%23EC5231' stroke-width='4.5' stroke-linecap='round'%3E%3Cpath d='M50 16 C 66 24, 66 40, 50 50 C 34 60, 34 76, 50 84'/%3E%3Cpath d='M18 42 C 30 34, 46 34, 50 50 C 54 66, 70 66, 82 58'/%3E%3Cpath d='M82 42 C 70 34, 54 34, 50 50 C 46 66, 30 66, 18 58'/%3E%3C/g%3E%3Ccircle cx='50' cy='50' r='3.2' fill='%23EC5231'/%3E%3C/svg%3E">
 <title>Beach Volleyball 2026 — Kalender & Ergebnisse (FIVB & CEV)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#EC5231">
@@ -20,15 +20,8 @@
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --mono:ui-monospace,"SF Mono","SFMono-Regular",Menlo,"Cascadia Code",Consolas,monospace;
   }
-  @media (prefers-color-scheme:dark){
-    :root{
-      --bg:#0D1418; --surface:#141E23; --surface-2:#18242A;
-      --ink:#E9F0EF; --muted:#93A3A6; --faint:#65777B; --line:#22323A;
-      --accent:#FF6242; --water:#2CB7C6; --gold:#E0AB47; --green:#33C088;
-      --t-elite16:#FF6242; --t-elite:#E0AB47; --t-challenge:#2CB7C6; --t-futures:#8598A0;
-      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.45);
-    }
-  }
+  /* Standard ist immer hell, unabhaengig von der Systemeinstellung — dunkel gibt's nur
+     ueber den manuellen Theme-Umschalter (data-theme="dark"), siehe Block weiter unten. */
   :root[data-theme="light"]{
     --bg:#F1EEE6; --surface:#FBFAF6; --surface-2:#F5F2EA; --ink:#182831; --muted:#5D6B70;
     --faint:#8A969A; --line:#E1DBCE; --accent:#EC5231; --water:#0E8E9C; --gold:#C8922A; --green:#1FA06A;
@@ -482,23 +475,16 @@
     </div>
     <div class="filterbar">
     <div class="chips" id="orgChips" role="group" aria-label="Verband">
-      <button class="chip" data-org="all" aria-pressed="true">Alle Verbände</button>
-      <button class="chip" data-org="FIVB" aria-pressed="false"><span class="dot" style="color:var(--water)"></span>FIVB</button>
+      <button class="chip" data-org="FIVB" aria-pressed="true"><span class="dot" style="color:var(--water)"></span>FIVB</button>
       <button class="chip" data-org="CEV" aria-pressed="false"><span class="dot" style="color:#7C5BD6"></span>CEV</button>
     </div>
     <div class="chips" id="statusChips" role="group" aria-label="Status">
-      <button class="chip" data-status="all" aria-pressed="true">Alle</button>
-      <button class="chip" data-status="finished" aria-pressed="false">Gespielt</button>
-      <button class="chip" data-status="live" aria-pressed="false">Live</button>
-      <button class="chip" data-status="upcoming" aria-pressed="false">Kommend</button>
-      <button class="chip sep" data-results="1" aria-pressed="false">★ Mit Ergebnissen</button>
+      <button class="chip" data-results="1" aria-pressed="false">★ Mit Ergebnissen</button>
     </div>
     <div class="chips" id="tierChips" role="group" aria-label="Stufe">
       <button class="chip" data-tier="Elite" aria-pressed="true">Elite</button>
       <button class="chip" data-tier="Challenge" aria-pressed="true">Challenge</button>
       <button class="chip" data-tier="Futures" aria-pressed="false">Futures</button>
-      <button class="chip sep" data-tier="Nations Cup" aria-pressed="false">Nations Cup</button>
-      <button class="chip" data-tier="CEV Tour" aria-pressed="false">CEV Tour</button>
     </div>
     </div>
     </div>
@@ -603,12 +589,13 @@ function eventResultNo(ev){
 }
 
 // State
-const state={q:'',org:'all',status:'all',onlyResults:false,
-  tiers:{Elite:true,Challenge:true,Futures:false,'Nations Cup':false,'CEV Tour':false}};
+const state={q:'',org:'FIVB',status:'all',onlyResults:false,
+  tiers:{Elite:true,Challenge:true,Futures:false}};
 // Tier eines Events der Filter-Gruppe zuordnen (Elite16 zaehlt zu "Elite"); alles andere
-// (EuroBeach, EM, Legacy-Tour, Finals/"Event") ist von diesem Filter nicht betroffen
+// (Nations Cup, CEV Tour, EuroBeach, EM, Legacy-Tour, Finals/"Event") ist von diesem
+// Filter nicht betroffen — CEV wird stattdessen komplett ueber den Verband-Filter gesteuert.
 const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite'
-  : (t==='Challenge'||t==='Futures'||t==='Nations Cup'||t==='CEV Tour') ? t : null;
+  : (t==='Challenge'||t==='Futures') ? t : null;
 
 // naechste noch nicht gespielte Matches eines laufenden Turniers, Herren+Damen gemischt
 // Ermittelt den UTC-Offset (Minuten) des Austragungsorts aus einem beliebigen Match mit
@@ -701,12 +688,12 @@ function render(){
   const list=document.getElementById('list');
   const q=state.q.toLowerCase().trim();
   let ev=DATA.events.filter(e=>{
-    if(state.org!=='all' && e.org!==state.org) return false;
     if(state.status!=='all' && e.status!==state.status) return false;
     if(state.onlyResults && !eventResultNo(e)) return false;
     if(q && !(e.city.toLowerCase().includes(q) || country(e.country).toLowerCase().includes(q)
         || e.tier.toLowerCase().includes(q))) return false;
-    if(e.status!=='live'){   // laufende Turniere immer zeigen, unabhaengig vom Stufen-Filter
+    if(e.status!=='live'){   // laufende Turniere immer zeigen, unabhaengig von Verband-/Stufen-Filter
+      if(state.org!=='all' && e.org!==state.org) return false;
       const grp=tierGroup(e.tier);
       if(grp && !state.tiers[grp]) return false;
     }
@@ -748,7 +735,7 @@ const scrim=document.getElementById('scrim'), drawer=document.getElementById('dr
 // Runden-Reihenfolge: Finale ganz oben → Gruppenphase → Qualifikation ganz unten
 // Bekannte KO-Runden mit Rang (kleiner = weiter oben). Alles andere wird aus den Daten abgeleitet,
 // damit KEINE Runde verloren geht — auch Zwischenrunden (R24/R32) oder unbekannte Codes.
-const KO_RANK={F1:0,F3:1,BM:1,GM:0,SF:2,QF:3,R16:4,R24:5,R32:6,R48:7,LL:9,I:60};
+const KO_RANK={F1:0,F3:1,BM:1,GM:0,SF:2,QF:3,R16:4,R24:5,R32:6,R48:7,LL:9};
 const ROUND_LABEL={F1:'Finale',F3:'Spiel um Platz 3',BM:'Spiel um Platz 3',SF:'Halbfinale',
   QF:'Viertelfinale',R16:'Achtelfinale',R24:'Zwischenrunde · Round of 24',
   R32:'Zwischenrunde · Round of 32',R48:'Zwischenrunde · Round of 48',
@@ -756,10 +743,13 @@ const ROUND_LABEL={F1:'Finale',F3:'Spiel um Platz 3',BM:'Spiel um Platz 3',SF:'H
 const POOL_COLORS=['#EC5231','#C8922A','#0E8E9C','#1FA06A','#7C5BD6','#D6355A','#2E9E6C','#5B78C0',
   '#B4791F','#0E6E9C'];
 const isPool=rc=>/^P[A-Z]$/.test(rc||'');
+// Qualifikationsrunden werden von FIVB als "I","II","III"… codiert (nicht nur "I") —
+// laengere Kette = spaetere/tiefere Quali-Runde.
+const isQuali=rc=>/^I+$/.test(rc||'');
 // macro-Phase: group | inter (Zwischenrunde) | final | quali
 function macroOf(rc,rn){
   if(isPool(rc)) return 'group';
-  if(rc==='I' || /qualif/i.test(rn||'')) return 'quali';
+  if(isQuali(rc) || /qualif/i.test(rn||'')) return 'quali';
   if(/^R\d\d/.test(rc||'') && +rc.slice(1)>=24) return 'inter';   // R24/R32/R48…
   if(/round of (2[4-9]|[3-9]\d)/i.test(rn||'')) return 'inter';
   return 'final';
@@ -774,12 +764,16 @@ function roundRank(rc,rn){
   const macro=macroOf(rc,rn);
   let sub;
   if(macro==='group') sub = isPool(rc) ? rc.charCodeAt(1)-65 : 50;
-  else if(macro==='quali') sub=0;
+  // laengere Quali-Kette (II, III…) = weiter gekommen = besser (niedrigerer Rang) als I
+  else if(macro==='quali') sub = isQuali(rc) ? 50-rc.length : 50;
   else if(rc in KO_RANK) sub=KO_RANK[rc];
   else sub = /^R(\d+)/.test(rc||'') ? +RegExp.$1 : 40;  // unbekannte KO/Zwischenrunde grob einsortieren
   return MACRO_ORDER[macro]*1000 + sub;
 }
-const roundLabel=(rc,rn)=>ROUND_LABEL[rc] || rn || rc || '—';
+const roundLabel=(rc,rn)=>{
+  if(isQuali(rc) && rc!=='I') return `Qualifikation · Runde ${rc.length}`;
+  return ROUND_LABEL[rc] || rn || rc || '—';
+};
 
 const played = m => (m.sets && m.sets.length>0) || m.st==='15';
 const isFinished = m => m.st==='15';
@@ -1312,6 +1306,7 @@ function renderPoolStandings(rm, allMatches){
 
 function renderList(){
   const {matches}=cur;
+  const offset=venueOffsetMinutes(matches);
   const chainInfo=computeChainOrder(matches);
   const codes=[...new Set(matches.map(m=>m.rc))].map(rc=>{
     const rn=(matches.find(m=>m.rc===rc)||{}).rn;
@@ -1329,7 +1324,7 @@ function renderList(){
     out += `<div class="dsub">${tick}${roundLabel(rc,rn)}</div>`;
     if(isPool(rc)) out += renderPoolStandings(rm, matches);
     for(const m of rm){
-      const time=(m.time||'').slice(0,5);
+      const time=dualTime(m.date,m.time,offset,true);
       if(!played(m)){
         const A=slotInfo(m,'a'), B=slotInfo(m,'b');
         // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
@@ -1757,8 +1752,7 @@ document.getElementById('tierChips').addEventListener('click',e=>{
 
 // Theme toggle
 document.getElementById('themebtn').addEventListener('click',()=>{
-  const t=document.documentElement.getAttribute('data-theme');
-  const isDark = t ? t==='dark' : matchMedia('(prefers-color-scheme:dark)').matches;
+  const isDark = document.documentElement.getAttribute('data-theme')==='dark';
   document.documentElement.setAttribute('data-theme', isDark?'light':'dark');
 });
 
