@@ -1,5 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%90%3C/text%3E%3C/svg%3E">
 <title>Beach Volleyball 2026 — Kalender & Ergebnisse (FIVB & CEV)</title>
 <style>
   :root{
@@ -71,13 +72,6 @@
   .toast.warn{background:var(--accent);color:#fff;}
 
   /* Stat tiles */
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
-  @media (max-width:560px){.stats{grid-template-columns:repeat(2,1fr);}}
-  .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-    padding:16px 16px 14px;box-shadow:var(--shadow);}
-  .tile .num{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:-.02em;
-    font-variant-numeric:tabular-nums;line-height:1;}
-  .tile .lab{font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin-top:8px;}
 
   /* Controls */
   .controls{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;position:sticky;top:0;
@@ -124,6 +118,15 @@
   .gender{font-family:var(--mono);font-size:10.5px;color:var(--faint);border:1px solid var(--line);
     border-radius:6px;padding:1px 6px;letter-spacing:.05em;}
   .right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+  .nextup{grid-column:1/-1;margin-top:6px;padding-top:7px;border-top:1px dashed var(--line);
+    display:flex;flex-direction:column;gap:3px;}
+  .nextlab{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--faint);margin-bottom:1px;}
+  .nextrow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+  .nextg{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);
+    border:1px solid var(--line);border-radius:5px;padding:0 4px;flex:0 0 auto;}
+  .nextt{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);flex:0 0 auto;}
+  .nextteams{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .status{font-size:11px;font-weight:600;letter-spacing:.03em;display:inline-flex;align-items:center;gap:6px;
     padding:3px 9px;border-radius:999px;white-space:nowrap;}
   .status.finished{color:var(--muted);background:var(--surface-2);border:1px solid var(--line);}
@@ -416,10 +419,10 @@
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <span class="eyebrow">FIVB &amp; CEV Beach Volleyball · Demo</span>
+      <span class="eyebrow">FIVB &amp; CEV Beach Volleyball</span>
       <h1>Beach Volleyball <span class="yr" id="yr">2026</span></h1>
       <p class="sub">Kalender &amp; Ergebnisse von FIVB Beach Pro Tour und CEV, live gezogen aus dem
-        <code>FIVB VIS</code> Web Service — derselben Quelle wie fivb.12ndr.at.
+        <code>FIVB VIS</code> Web Service.
         Klick auf eine Turnierzeile öffnet die Ergebnisse.</p>
     </div>
     <div class="hdr-actions">
@@ -430,8 +433,6 @@
       <button class="themebtn" id="themebtn" type="button">◑ Theme</button>
     </div>
   </header>
-
-  <section class="stats" id="stats" aria-label="Überblick"></section>
 
   <div class="controls">
     <div class="search">
@@ -469,7 +470,7 @@
     <span id="footStats"></span>
     Vor 2023 (vor der "Beach Pro Tour"-Marke) sind Turniere heuristisch aus Hauptfeldgröße und
     Turnierkennung ermittelt — einzelne Ein-/Ausordnungen können abweichen.
-    Inoffizielle Demo, keine Verbindung zu FIVB oder CEV. ·
+    Keine offizielle Verbindung zu FIVB oder CEV. ·
     <a class="src" href="https://fivbvis.openvolley.org/" target="_blank" rel="noopener">VIS-Doku</a>
   </footer>
 </div>
@@ -562,20 +563,25 @@ const state={q:'',org:'all',status:'all',onlyResults:false,
 const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite'
   : (t==='Challenge'||t==='Futures'||t==='Nations Cup'||t==='CEV Tour') ? t : null;
 
-// Stats
-function renderStats(){
-  const ev=DATA.events;
-  const countries=new Set(ev.map(e=>country(e.country)));
-  const tiles=[
-    ['Turniere', ev.length],
-    ['FIVB', ev.filter(e=>e.org==='FIVB').length],
-    ['CEV', ev.filter(e=>e.org==='CEV').length],
-    ['Länder', countries.size],
-  ];
-  document.getElementById('stats').innerHTML = tiles.map(([l,n])=>
-    `<div class="tile"><div class="num">${n}</div><div class="lab">${l}</div></div>`).join('');
+// naechste noch nicht gespielte Matches eines laufenden Turniers, Herren+Damen gemischt
+function nextUpMatches(ev, limit=2){
+  const out=[];
+  if(ev.M && DATA.results[ev.M.no]) for(const m of DATA.results[ev.M.no]) if(!played(m)) out.push({m,g:'M'});
+  if(ev.W && DATA.results[ev.W.no]) for(const m of DATA.results[ev.W.no]) if(!played(m)) out.push({m,g:'W'});
+  out.sort((a,b)=>(a.m.date+a.m.time).localeCompare(b.m.date+b.m.time));
+  return out.slice(0,limit);
 }
-
+function nextUpHtml(e){
+  if(e.status!=='live') return '';
+  const next=nextUpMatches(e);
+  if(!next.length) return '';
+  const rows=next.map(({m,g})=>{
+    const time=(m.time||'').slice(0,5);
+    return `<div class="nextrow"><span class="nextg">${g}</span><span class="nextt">${time||'—'}</span>
+      <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span></div>`;
+  }).join('');
+  return `<div class="nextup"><div class="nextlab">Als Nächstes</div>${rows}</div>`;
+}
 function eventRow(e){
   const tv=tierColor(e.tier);
   const genders=[e.M?'M':null,e.W?'W':null].filter(Boolean).join(' · ');
@@ -601,6 +607,7 @@ function eventRow(e){
         <div class="country">${country(e.country)}</div>
       </div>
       <div class="right">${st}${cue}</div>
+      ${nextUpHtml(e)}
     </div>`;
 }
 
@@ -875,7 +882,7 @@ async function fetchLiveMatches(no){
   return out;
 }
 async function refreshLive(){
-  const btn=document.getElementById('liveBtn'), {no}=cur;
+  const btn=document.getElementById('liveBtn'), {no,ev}=cur;
   btn.disabled=true; btn.textContent='⟳ Lädt…';
   try{
     const matches=await fetchLiveMatches(no);
@@ -883,6 +890,7 @@ async function refreshLive(){
     DATA.results[no]=matches; cur.matches=matches;
     const byN={}; matches.forEach(m=>byN[m.n]=m); cur.byN=byN;
     reRenderKeepOpen();
+    if(ev.status==='live') startLivePoll(ev,no);
     render();
     flash('Live-Daten direkt von FIVB geladen.');
   }catch(e){
@@ -952,14 +960,36 @@ function openDrawer(ev,gender){
   }
   // Laeuft das Turnier gerade, beim Oeffnen still die aktuellsten Ergebnisse direkt von
   // FIVB nachladen — kein Warten auf den stuendlichen Cache oder den Live-Button.
+  stopLivePoll();
   if(ev.status==='live'){
     fetchLiveMatches(no).then(fresh=>{
       if(!fresh.length || !cur || cur.ev!==ev || cur.no!==no) return;
       DATA.results[no]=fresh; cur.matches=fresh;
       const byN2={}; fresh.forEach(m=>byN2[m.n]=m); cur.byN=byN2;
       reRenderKeepOpen();
+      startLivePoll(ev,no);
     }).catch(()=>{});
   }
+}
+// Alle 15s neu laden, aber nur solange der Drawer offen bleibt UND tatsaechlich ein
+// Match gerade laeuft (nicht bloss "Turnier im Zeitraum live") — spart Anfragen, wenn
+// gerade Pause ist.
+let livePollTimer=null;
+function stopLivePoll(){ if(livePollTimer){ clearInterval(livePollTimer); livePollTimer=null; } }
+function startLivePoll(ev,no){
+  stopLivePoll();
+  if(!cur.matches.some(isLive)) return;
+  livePollTimer=setInterval(async ()=>{
+    if(!cur || cur.ev!==ev || cur.no!==no){ stopLivePoll(); return; }
+    try{
+      const fresh=await fetchLiveMatches(no);
+      if(!fresh.length || !cur || cur.ev!==ev || cur.no!==no) return;
+      DATA.results[no]=fresh; cur.matches=fresh;
+      const byN2={}; fresh.forEach(m=>byN2[m.n]=m); cur.byN=byN2;
+      reRenderKeepOpen();
+      if(!fresh.some(isLive)) stopLivePoll();
+    }catch(e){ /* naechster Tick versucht es erneut */ }
+  }, 15000);
 }
 document.getElementById('genderToggle').addEventListener('click',e=>{
   const b=e.target.closest('.vt'); if(!b||b.getAttribute('aria-pressed')==='true') return;
@@ -1148,6 +1178,7 @@ function renderBracket(){
   return `<div class="bkt-scroll"><div class="bkt">${cols}</div></div>${bronze}${note}`;
 }
 function closeDrawer(){
+  stopLivePoll();
   scrim.classList.remove('open'); drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true');
 }
 scrim.addEventListener('click',closeDrawer);
@@ -1390,7 +1421,7 @@ function updateMeta(){
   document.getElementById('yr').textContent = DATA.season;
   const resCount = Object.keys(DATA.results).length;
   document.getElementById('footStats').textContent =
-    `${DATA.events.length} FIVB- & CEV-Events der Saison ${DATA.season}, ${resCount} davon mit vollständigen Match-Ergebnissen inkl. Satzergebnissen (Herren).`;
+    `${DATA.events.length} FIVB- & CEV-Events der Saison ${DATA.season}, ${resCount} Turniere (Herren/Damen) davon mit vollständigen Match-Ergebnissen inkl. Satzergebnissen.`;
 }
 let toastTimer;
 function flash(msg, warn){
@@ -1402,7 +1433,7 @@ function applyData(j){
   closeDrawer();
   DATA=j; resultNos=new Set(Object.keys(DATA.results));
   DATA.events.forEach((e,i)=>e._idx=i);
-  renderStats(); render(); updateStand(); updateMeta();
+  render(); updateStand(); updateMeta();
 }
 async function loadSeason(y, silent){
   const btn=document.getElementById('refreshbtn');
@@ -1419,7 +1450,7 @@ async function loadSeason(y, silent){
   }catch(e){
     document.getElementById('seasonSel').value = season;
     if(!silent) flash(y===season
-      ? 'Keine Live-Daten erreichbar. In dieser Vorschau ist das normal — online (gehostet) holt der Button die neuen Ergebnisse.'
+      ? 'Keine Live-Daten erreichbar. Bitte später erneut versuchen.'
       : `Keine Daten für Saison ${y} erreichbar.`, true);
   }finally{
     if(!silent){ btn.disabled=false; btn.textContent='⟳ Aktualisieren'; }
@@ -1431,6 +1462,6 @@ document.getElementById('seasonSel').addEventListener('change', e=>loadSeason(+e
 // ---- Init ----
 buildSeasonSelect();
 DATA.events.forEach((e,i)=>e._idx=i);
-renderStats(); render(); updateStand(); updateMeta();
-loadSeason(season, true);   // beim Laden still versuchen, aktuelle Saison-Datei zu ziehen (funktioniert gehostet)
+render(); updateStand(); updateMeta();
+loadSeason(season, true);   // beim Laden still versuchen, aktuelle Saison-Datei zu ziehen
 </script>
