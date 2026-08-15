@@ -202,10 +202,10 @@
   .livebtn:hover:not(:disabled){background:color-mix(in srgb,var(--water) 10%,transparent);}
   .livebtn:disabled{opacity:.6;cursor:default;}
   .vtoggle{display:inline-flex;margin-top:12px;background:var(--surface-2);border:1px solid var(--line);
-    border-radius:9px;padding:3px;gap:3px;}
+    border-radius:12px;padding:4px;gap:4px;}
   .vtoggle[hidden]{display:none;}
-  .vt{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--muted);background:none;
-    border:none;border-radius:6px;padding:6px 13px;cursor:pointer;}
+  .vt{font-family:var(--sans);font-size:14px;font-weight:600;color:var(--muted);background:none;
+    border:none;border-radius:8px;padding:9px 18px;cursor:pointer;}
   .vt[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);}
   .vt:hover{color:var(--ink);}
   .vt[hidden]{display:none;}
@@ -489,8 +489,9 @@
       <button class="vt" data-g="W" type="button" aria-pressed="false">Damen</button>
     </div>
     <div class="vtoggle" id="vtoggle" role="group" aria-label="Ansicht">
-      <button class="vt" data-view="list" type="button" aria-pressed="true">☰ Liste</button>
-      <button class="vt" data-view="bracket" type="button" aria-pressed="false">⑃ Baum</button>
+      <button class="vt" data-view="list" type="button" aria-pressed="true">Liste</button>
+      <button class="vt" data-view="bracket" type="button" aria-pressed="false">Baum</button>
+      <button class="vt" data-view="seeds" type="button" aria-pressed="false">Setzliste</button>
     </div>
   </header>
   <div id="dChamp"></div>
@@ -1001,7 +1002,7 @@ function setView(v){
   document.querySelectorAll('#vtoggle .vt').forEach(b=>b.setAttribute('aria-pressed', b.dataset.view===v));
   drawer.classList.toggle('wide', v==='bracket');
   const body=document.getElementById('dBody');
-  body.innerHTML = v==='bracket' ? renderBracket() : renderList();
+  body.innerHTML = v==='bracket' ? renderBracket() : v==='seeds' ? renderSeedList() : renderList();
   body.scrollTop=0;
 }
 
@@ -1078,6 +1079,51 @@ function renderList(){
     }
   }
   return body;
+}
+
+// Setzliste: alle Teams des Turniers, sortiert nach Setzposition, mit Land und
+// aktuellem Stand (Champion / Ausgeschieden in Runde X / noch im Turnier).
+function buildSeedList(matches){
+  const teams=new Map();
+  for(const m of matches){
+    for(const side of ['a','b']){
+      const name=m[side]; if(!name) continue;
+      const t=teams.get(name) || {name, seed:null, fed:null, matches:[]};
+      const seed = side==='a' ? m.sda : m.sdb;
+      const fedc = side==='a' ? m.ca : m.cb;
+      if(seed) t.seed=seed;
+      if(fedc) t.fed=fedc;
+      t.matches.push({m,side});
+      teams.set(name,t);
+    }
+  }
+  const rows=[...teams.values()].map(t=>{
+    let best=null, bestRank=Infinity;
+    for(const {m,side} of t.matches){
+      if(!isFinished(m)) continue;
+      const rank=roundRank(m.rc,m.rn);
+      if(rank<bestRank){ bestRank=rank; best={m,side}; }
+    }
+    let result='noch nicht gestartet';
+    if(best){
+      const {m,side}=best;
+      const won = side==='a' ? (+m.sa>+m.sb) : (+m.sb>+m.sa);
+      result = (won && m.rc==='F1') ? 'Champion'
+        : !won ? `Aus: ${roundLabel(m.rc,m.rn)}`
+        : 'noch im Turnier';
+    }
+    return {...t, result};
+  });
+  rows.sort((a,b)=>(a.seed||999)-(b.seed||999) || a.name.localeCompare(b.name));
+  return rows;
+}
+function renderSeedList(){
+  const rows=buildSeedList(cur.matches);
+  if(!rows.length) return '<div class="bkt-note">Für dieses Turnier liegt keine Setzliste vor.</div>';
+  const trs=rows.map(t=>`<tr><td class="pos">${t.seed||'–'}</td><td class="nm">${t.name} ${fed(t.fed)}</td>
+    <td>${t.result}</td></tr>`).join('');
+  return `<table class="standings"><thead><tr><th class="n">Setzung</th><th>Team</th><th>Stand</th></tr></thead>
+    <tbody>${trs}</tbody></table>`;
 }
 
 function bracketBox(m){
