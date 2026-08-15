@@ -39,10 +39,6 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
     line-height:1.5;-webkit-font-smoothing:antialiased;}
   .wrap{max-width:960px;margin:0 auto;padding:clamp(18px,4vw,40px) clamp(16px,4vw,28px) 80px;}
-  @media (min-width:1280px){
-    .wrap{max-width:1180px;}
-    body{zoom:1.12;}
-  }
 
   /* Header */
   header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
@@ -195,6 +191,9 @@
   .drawer .dclose{position:absolute;top:14px;right:16px;background:var(--surface-2);border:1px solid var(--line);
     border-radius:8px;width:32px;height:32px;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;}
   .drawer .dclose:hover{color:var(--ink);}
+  .drawer .dshare{position:absolute;top:14px;right:58px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:8px;width:32px;height:32px;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;}
+  .drawer .dshare:hover{color:var(--ink);border-color:var(--faint);}
   .drawer.wide{width:min(1220px,100%);}
   .drawer h2{margin:0 0 3px;font-size:20px;letter-spacing:-.01em;}
   .drawer .dmeta{font-family:var(--mono);font-size:12px;color:var(--muted);}
@@ -319,6 +318,18 @@
   .h2r .h2s{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;}
   .pcname{font-size:19px;letter-spacing:-.01em;color:var(--ink);text-transform:none;}
   .pcname b{font-weight:800;}
+  .lastmatches{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);}
+  .lastm{display:grid;grid-template-columns:20px 64px 1fr auto;gap:8px;align-items:center;
+    padding:5px 4px;border-radius:6px;font-size:12px;cursor:pointer;}
+  .lastm:hover{background:var(--surface-2);}
+  .lm-res{font-family:var(--mono);font-weight:700;font-size:10.5px;text-align:center;
+    border-radius:5px;padding:1px 0;color:#fff;}
+  .lm-res.w{background:var(--green);}
+  .lm-res.l{background:var(--faint);}
+  .lm-date{font-family:var(--mono);color:var(--faint);font-size:11px;}
+  .lm-opp{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
+  .lm-score{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;}
+  .lm-city{grid-column:2/-1;font-size:11px;color:var(--faint);margin-top:-3px;}
   .bx .brow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:2px 0;font-size:12.5px;}
   .bx .brow+.brow{border-top:1px dashed var(--line);}
   .bx .brow.win .bn{font-weight:700;color:var(--ink);}
@@ -406,17 +417,13 @@
   .mdetail .sdur::before{content:"⏱ ";opacity:.5;}
   .mdetail .setgrid .tot{border-top:1px solid var(--line);padding-top:5px;margin-top:2px;}
   .mdetail .tot.sk{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:10px;}
-  .mdetail .mdmeta{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
-    display:flex;flex-direction:column;gap:5px;font-size:12px;}
-  .mdetail .mdmeta .r{display:flex;gap:8px;}
-  .mdetail .mdmeta .k{color:var(--faint);flex:0 0 82px;}
-  .mdetail .mdmeta .v{color:var(--ink);}
-  .livebanner{display:flex;align-items:center;gap:10px;margin:10px 22px 4px;padding:9px 16px;
-    background:color-mix(in srgb,var(--green) 12%,var(--surface));
-    border:1px solid color-mix(in srgb,var(--green) 35%,var(--line));border-radius:12px;
-    font-weight:600;font-size:14px;color:var(--ink);}
-  .livebanner .pulse{width:9px;height:9px;border-radius:50%;background:var(--green);
-    box-shadow:0 0 0 0 var(--green);animation:pulse 1.6s infinite;}
+  /* Basis-Layout gilt ueberall wo .mdmeta genutzt wird (Match-Detail UND Spielerprofil);
+     der obere Trennstrich nur im Match-Detail, wo davor bereits andere Inhalte stehen. */
+  .mdmeta{display:flex;flex-direction:column;gap:5px;font-size:12px;}
+  .mdmeta .r{display:flex;gap:8px;}
+  .mdmeta .k{color:var(--faint);flex:0 0 82px;}
+  .mdmeta .v{color:var(--ink);}
+  .mdetail .mdmeta{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
 
   footer.foot{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);
     font-size:12px;color:var(--faint);line-height:1.6;}
@@ -491,6 +498,7 @@
 <aside class="drawer" id="drawer" aria-hidden="true" aria-label="Turnier-Ergebnisse">
   <header>
     <button class="dclose" id="dclose" type="button" aria-label="Schließen">✕</button>
+    <button class="dshare" id="dshare" type="button" title="Link zu diesem Turnier kopieren" aria-label="Link kopieren">🔗</button>
     <h2 id="dTitle"></h2>
     <div class="dmeta-row">
       <div class="dmeta" id="dMeta"></div>
@@ -771,8 +779,56 @@ function buildPlayerCard(no){
     p.yb?['Beach seit', p.yb]:null,
     p.tm?['Team', p.tm]:null,
   ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-  return `<div class="mdmeta">${rows}</div>`;
+  return `<div class="mdmeta">${rows}</div><div id="pmLast">${renderLastMatches(no)}</div>`;
 }
+// letzte gespielten Matches eines Spielers, ueber alle geladenen Saisonen hinweg
+function personalMatches(playerNo, limit=5){
+  const out=[];
+  for(const sd of Object.values(seasonCache)){
+    for(const [tno,ms] of Object.entries(sd.results||{})){
+      for(const m of ms){
+        if(!isFinished(m)) continue;
+        const pa=(m.pa||[]).map(String), pb=(m.pb||[]).map(String);
+        if(pa.includes(playerNo)) out.push({m,side:'a',tno,season:sd.season,city:((sd.venues||{})[tno]||{}).city||''});
+        else if(pb.includes(playerNo)) out.push({m,side:'b',tno,season:sd.season,city:((sd.venues||{})[tno]||{}).city||''});
+      }
+    }
+  }
+  out.sort((a,b)=>(b.m.date||'').localeCompare(a.m.date||''));
+  return out.slice(0,limit);
+}
+function renderLastMatches(playerNo){
+  if(!allSeasonsLoaded) return '<p class="h2hNote">Lädt Spielverlauf …</p>';
+  const enc=personalMatches(playerNo,5);
+  if(!enc.length) return '';
+  const rows=enc.map(({m,side,tno,season,city})=>{
+    const won = side==='a' ? (+m.sa>+m.sb) : (+m.sb>+m.sa);
+    const opp = side==='a' ? m.b : m.a;
+    const score = side==='a' ? `${m.sa}:${m.sb}` : `${m.sb}:${m.sa}`;
+    return `<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
+        aria-label="Ergebnis ${city} öffnen">
+      <span class="lm-res ${won?'w':'l'}">${won?'S':'N'}</span>
+      <span class="lm-date">${m.date||''}</span>
+      <span class="lm-opp">vs ${opp||'—'}</span>
+      <span class="lm-score">${score}</span>
+      <span class="lm-city">${city}</span>
+    </div>`;
+  }).join('');
+  return `<div class="lastmatches"><div class="h2title">Letzte Spiele</div>${rows}</div>`;
+}
+document.getElementById('pmBody').addEventListener('click', e=>{
+  const row=e.target.closest('.lastm'); if(!row) return;
+  const tno=row.dataset.tno, s=+row.dataset.season;
+  closePlayerCard();
+  const openIt=()=>{
+    const ev=DATA.events.find(x=>(x.M&&x.M.no===tno)||(x.W&&x.W.no===tno));
+    if(ev) openDrawer(ev, (ev.W&&ev.W.no===tno)?'W':'M');
+  };
+  if(s!==DATA.season){
+    document.getElementById('seasonSel').value=s;
+    loadSeason(s, true).then(openIt);
+  } else openIt();
+});
 
 // Ausführliches Match-Detail: Satz-für-Satz mit Dauer, Zusatzdaten, Head-to-Head
 function buildMatchDetail(m){
@@ -983,7 +1039,7 @@ function updateDrawerContent(){
   document.getElementById('dChamp').innerHTML = champ
     ? `<div class="champ"><span class="trophy">🏆</span><div>
         <div class="clab">Champion</div><div class="cname">${champ}</div></div></div>`
-    : `<div class="livebanner"><span class="pulse"></span>Turnier läuft noch — Ergebnisse werden laufend ergänzt</div>`;
+    : '';
 
   const gt=document.getElementById('genderToggle');
   gt.hidden = !(mNo && wNo);
@@ -1037,6 +1093,32 @@ function openDrawer(ev,gender){
       startLivePoll(ev,no);
     }).catch(()=>{});
   }
+}
+// Link zum gerade offenen Turnier: Saison+Turniernummer+Geschlecht im URL-Hash, damit
+// ein geteilter Link direkt das richtige Ergebnis oeffnet (auch saisonuebergreifend).
+function shareUrl(no,gender,season){
+  const u=new URL(location.href);
+  u.hash=`t=${no}&g=${gender}&s=${season}`;
+  return u.toString();
+}
+document.getElementById('dshare').addEventListener('click', async ()=>{
+  if(!cur) return;
+  const url=shareUrl(cur.no, cur.gender, DATA.season);
+  try{ await navigator.clipboard.writeText(url); flash('Link kopiert.'); }
+  catch(e){ history.replaceState(null,'',url); flash('Link in der Adressleiste — bitte manuell kopieren.', true); }
+});
+function openFromHash(){
+  const h=new URLSearchParams(location.hash.slice(1));
+  const t=h.get('t'), g=h.get('g'), s=h.get('s');
+  if(!t) return;
+  const openIt=()=>{
+    const ev=DATA.events.find(e=>(e.M&&e.M.no===t)||(e.W&&e.W.no===t));
+    if(ev) openDrawer(ev, g||undefined);
+  };
+  if(s && +s!==DATA.season){
+    document.getElementById('seasonSel').value=s;
+    loadSeason(+s, true).then(openIt);
+  } else openIt();
 }
 // Alle 15s neu laden, aber nur solange der Drawer offen bleibt UND tatsaechlich ein
 // Match gerade laeuft (nicht bloss "Turnier im Zeitraum live") — spart Anfragen, wenn
@@ -1134,13 +1216,17 @@ function renderList(){
       const time=(m.time||'').slice(0,5);
       if(!played(m)){
         const A=slotInfo(m,'a'), B=slotInfo(m,'b');
-        body += `<div class="match sched">
+        // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
+        const preview = m.a && m.b;
+        body += `<div class="match sched${preview?' expandable':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Head-to-Head ${m.a} gegen ${m.b}"`:''}>
           <div class="mt">${time||'—'}</div>
           <div class="teams">
             <div class="team ${A.feeder?'feeder':''}"><span class="tn">${slotText(A)}</span><span></span><span class="pt">–</span></div>
             <div class="team ${B.feeder?'feeder':''}"><span class="tn">${slotText(B)}</span><span></span><span class="pt">–</span></div>
           </div>
+          ${preview?'<span class="mchev">›</span>':''}
         </div>`;
+        if(preview) body += `<div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
         continue;
       }
       const live=isLive(m), aWin=!live && +m.sa>+m.sb;
@@ -1352,6 +1438,14 @@ function openPlayerCard(no){
   document.getElementById('pmBody').innerHTML = buildPlayerCard(no);
   pscrim.classList.add('open'); pmodal.classList.add('open'); pmodal.setAttribute('aria-hidden','false');
   document.getElementById('pmClose').focus();
+  if(!allSeasonsLoaded){
+    ensureAllSeasonsLoaded().then(()=>{
+      if(pmodal.classList.contains('open')){
+        const el=document.getElementById('pmLast');
+        if(el) el.innerHTML=renderLastMatches(no);
+      }
+    });
+  }
 }
 function closePlayerCard(){ pscrim.classList.remove('open'); pmodal.classList.remove('open'); pmodal.setAttribute('aria-hidden','true'); }
 pscrim.addEventListener('click',closePlayerCard);
@@ -1589,5 +1683,7 @@ document.getElementById('seasonSel').addEventListener('change', e=>loadSeason(+e
 buildSeasonSelect();
 DATA.events.forEach((e,i)=>e._idx=i);
 render(); updateStand(); updateMeta();
-loadSeason(season, true);   // beim Laden still versuchen, aktuelle Saison-Datei zu ziehen
+// erst die aktuelle Saison-Datei still nachziehen (applyData schliesst sonst einen per
+// Hash bereits geoeffneten Drawer wieder), danach ggf. Turnier aus dem Link-Hash oeffnen
+loadSeason(season, true).then(openFromHash);
 </script>
