@@ -69,9 +69,9 @@ NATIONAL_ORG = {"AUT": "OEVV", "GER": "DVV"}
 NATIONAL_NAME_PREFIX_RE = re.compile(r"^(AUT NT|GER NT|GER RTB)\s*-\s*", re.I)
 
 
-def classify(name, code="", teams=None, season=None):
+def classify(name, code="", teams=None, season=None, default_city=""):
     """Nur relevante Turniere: FIVB Beach Pro Tour + CEV (+ deren Vorgaenger vor 2023) +
-    OeVV/DVV-Nationaltouren. Sonst None. Rueckgabe: (org, tier, city)."""
+    OeVV/DVV-Nationaltouren + Senior-WM. Sonst None. Rueckgabe: (org, tier, city)."""
     n = name
     if re.search(r"CANCEL", n, re.I):
         return None
@@ -80,6 +80,11 @@ def classify(name, code="", teams=None, season=None):
                 "Challenge" if "Challenge" in n else "Futures" if re.search(r"Futures?", n) else "Event")
         city = re.sub(r"^BPT\s+(Elite16|Elite|Challenge|Futures?)\s+", "", n).strip()
         return ("FIVB", tier, city)
+    # Senior-WM (ab 2023 nicht mehr "BPT"-getaggt, Name traegt meist keine Stadt — die
+    # kommt daher aus DefaultCity). Wichtig fuer die Punkte-Regel (zaehlt fuer Entry/Seeding
+    # Points), sonst faellt sie fuer Saisons >= 2023 komplett durchs Raster.
+    if re.search(r"FIVB Beach Volleyball World Championships", n, re.I):
+        return ("FIVB", "World Champs", default_city.strip() or "World Championships")
     if "CEV Test" in n:
         return None
     if re.search(r"CEV|EuroBeachVolley|European Championship", n, re.I):
@@ -137,7 +142,8 @@ def build_events(tournaments):
     """Paart Herren/Damen je Turnier und leitet Status aus dem Datum ab."""
     groups = {}
     for t in tournaments:
-        cl = classify(t["Name"], t.get("Code", ""), num(t.get("NbTeamsMainDraw")), num(t.get("Season")))
+        cl = classify(t["Name"], t.get("Code", ""), num(t.get("NbTeamsMainDraw")), num(t.get("Season")),
+                      t.get("DefaultCity", ""))
         if not cl:
             continue
         org, tier, city = cl
@@ -255,7 +261,7 @@ def main():
     print(f"[generate] Saison {SEASON} · Stand {TODAY}")
     tour = [t.attrib for t in vis(
         "<Request Type='GetBeachTournamentList' "
-        "Fields='No Code Name CountryName StartDateMainDraw EndDateMainDraw Gender Type Season NbTeamsMainDraw'>"
+        "Fields='No Code Name CountryName DefaultCity StartDateMainDraw EndDateMainDraw Gender Type Season NbTeamsMainDraw'>"
         f"<Filter Season='{SEASON}'/></Request>").iter("BeachTournament")]
     events = build_events(tour)
     print(f"[generate] {len(events)} relevante Events (FIVB+CEV+ÖVV/DVV)")
