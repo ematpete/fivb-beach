@@ -155,6 +155,8 @@
     border-radius:5px;border:1px solid var(--line);color:var(--muted);}
   .org.CEV{color:#7C5BD6;border-color:color-mix(in srgb,#7C5BD6 45%,transparent);}
   .org.FIVB{color:var(--water);border-color:color-mix(in srgb,var(--water) 40%,transparent);}
+  .org.OEVV{color:#C1444E;border-color:color-mix(in srgb,#C1444E 45%,transparent);}
+  .org.DVV{color:#3E6B8A;border-color:color-mix(in srgb,#3E6B8A 45%,transparent);}
   .row.clickable{cursor:pointer;}
   .row.clickable:hover{border-color:var(--faint);transform:translateY(-1px);
     box-shadow:0 2px 4px rgba(24,40,49,.08),0 14px 34px rgba(24,40,49,.12);}
@@ -457,8 +459,8 @@
     <div class="brand">
       <span class="eyebrow">FIVB &amp; CEV Beach Volleyball</span>
       <h1>Beach Volleyball <span class="yr" id="yr">2026</span></h1>
-      <p class="sub">Kalender &amp; Ergebnisse von FIVB Beach Pro Tour und CEV, live gezogen aus dem
-        <code>FIVB VIS</code> Web Service.
+      <p class="sub">Kalender &amp; Ergebnisse von FIVB Beach Pro Tour, CEV sowie ÖVV-/DVV-Nationaltour,
+        live gezogen aus dem <code>FIVB VIS</code> Web Service.
         Klick auf eine Turnierzeile öffnet die Ergebnisse.</p>
     </div>
     <div class="hdr-actions">
@@ -480,6 +482,8 @@
     <div class="chips" id="orgChips" role="group" aria-label="Verband">
       <button class="chip" data-org="FIVB" aria-pressed="true"><span class="dot" style="color:var(--water)"></span>FIVB</button>
       <button class="chip" data-org="CEV" aria-pressed="false"><span class="dot" style="color:#7C5BD6"></span>CEV</button>
+      <button class="chip" data-org="OEVV" aria-pressed="false"><span class="dot" style="color:#C1444E"></span>ÖVV</button>
+      <button class="chip" data-org="DVV" aria-pressed="false"><span class="dot" style="color:#3E6B8A"></span>DVV</button>
     </div>
     <div class="chips" id="tierChips" role="group" aria-label="Stufe">
       <button class="chip" data-tier="Elite" aria-pressed="true">Elite</button>
@@ -498,7 +502,7 @@
     <span id="footStats"></span>
     Vor 2023 (vor der "Beach Pro Tour"-Marke) sind Turniere heuristisch aus Hauptfeldgröße und
     Turnierkennung ermittelt — einzelne Ein-/Ausordnungen können abweichen.
-    Keine offizielle Verbindung zu FIVB oder CEV. ·
+    Keine offizielle Verbindung zu FIVB, CEV, ÖVV oder DVV. ·
     <a class="src" href="https://fivbvis.openvolley.org/" target="_blank" rel="noopener">VIS-Doku</a>
   </footer>
 </div>
@@ -569,8 +573,10 @@ let DATA = {"season":2026,"generated":"2026-08-13","events":[{"org":"FIVB","tier
 
 const TIER_COLOR = {Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
-  'World Tour':'#3E7CB1','World Champs':'#B0304A',Masters:'#8A63D2'};
+  'World Tour':'#3E7CB1','World Champs':'#B0304A',Masters:'#8A63D2',National:'#8E7355'};
 const tierColor = t => TIER_COLOR[t] || '#79868E';
+const ORG_LABEL = {FIVB:'FIVB',CEV:'CEV',OEVV:'ÖVV',DVV:'DVV'};
+const orgLabel = o => ORG_LABEL[o] || o;
 const CC_FIX = {'01':'Great Britain'};
 const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const fmtRange = (s,e)=>{
@@ -674,7 +680,7 @@ function eventRow(e, showNextUp){
       <div class="date">${fmtRange(e.start,e.end)}<b>${e.start.slice(8)}. ${MONTHS[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
       <div class="main">
         <div class="city">${e.city}
-          <span class="badges"><span class="org ${e.org}">${e.org}</span>
+          <span class="badges"><span class="org ${e.org}">${orgLabel(e.org)}</span>
           <span class="tier-badge" style="--tier:${tv}">${e.tier}</span>
           <span class="gender">${genders||'–'}</span></span>
         </div>
@@ -1137,7 +1143,7 @@ function updateDrawerContent(){
   document.getElementById('dTitle').innerHTML = `${ev.city} — ${g==='M'?'Herren':'Damen'}`
     + (ev.status==='live' ? ` <span class="livechip dtitle-live"><span class="pulse"></span>Live</span>` : '');
   document.getElementById('dMeta').textContent =
-    `${ev.org} · ${ev.tier} · ${matches.filter(played).length}/${matches.length} Matches gespielt · ${DATA.season}`;
+    `${orgLabel(ev.org)} · ${ev.tier} · ${matches.filter(played).length}/${matches.length} Matches gespielt · ${DATA.season}`;
   document.getElementById('dChamp').innerHTML = champ
     ? `<div class="champ"><span class="trophy">🏆</span><div>
         <div class="clab">Champion</div><div class="cname">${champ}</div></div></div>`
@@ -1790,7 +1796,7 @@ function updateMeta(){
   document.getElementById('yr').textContent = DATA.season;
   const resCount = Object.keys(DATA.results).length;
   document.getElementById('footStats').textContent =
-    `${DATA.events.length} FIVB- & CEV-Events der Saison ${DATA.season}, ${resCount} Turniere (Herren/Damen) davon mit vollständigen Match-Ergebnissen inkl. Satzergebnissen.`;
+    `${DATA.events.length} Events der Saison ${DATA.season}, ${resCount} Turniere (Herren/Damen) davon mit vollständigen Match-Ergebnissen inkl. Satzergebnissen.`;
 }
 let toastTimer;
 function flash(msg, warn){

@@ -60,11 +60,18 @@ NOISE_RE = re.compile(
     r"\bTest\b|Training|\bAVC\b|\bCAVB\b|\bNORCECA\b|\bCSVP\b|\bASVBF\b|\bEEVZA\b|\bNEVZA\b|"
     r"African Games|Mediterranean.*Games|SEA Games|\bFISU\b|Commonwealth Games|King of the Court",
     re.I)
+# Nationale Verbandstouren (OeVV/DVV): VIS nutzt hier den Laendercode selbst als
+# Code-Praefix statt einer Stadt-Abkuerzung (z.B. "MAUT0526" statt "MHAM2025" fuer eine
+# echte BPT-Stadt) — zuverlaessiges Unterscheidungsmerkmal unabhaengig vom Turniernamen.
+# Aeltere Saisons nutzten dafuer noch Stadt-Codes (nicht unterscheidbar) — bleiben aussen vor.
+NATIONAL_TOUR_RE = re.compile(r"^[MW](AUT|GER)\d+$")
+NATIONAL_ORG = {"AUT": "OEVV", "GER": "DVV"}
+NATIONAL_NAME_PREFIX_RE = re.compile(r"^(AUT NT|GER NT|GER RTB)\s*-\s*", re.I)
 
 
 def classify(name, code="", teams=None, season=None):
-    """Nur relevante Turniere: FIVB Beach Pro Tour + CEV (+ deren Vorgaenger vor 2023). Sonst None.
-    Rueckgabe: (org, tier, city)."""
+    """Nur relevante Turniere: FIVB Beach Pro Tour + CEV (+ deren Vorgaenger vor 2023) +
+    OeVV/DVV-Nationaltouren. Sonst None. Rueckgabe: (org, tier, city)."""
     n = name
     if re.search(r"CANCEL", n, re.I):
         return None
@@ -100,6 +107,13 @@ def classify(name, code="", teams=None, season=None):
         if NOISE_RE.search(n) or AGE_RE.search(n):
             return None
         return ("CEV", "CEV", re.sub(r"^CEV\s+", "", n).strip())
+    # OeVV/DVV-Nationaltouren: erst NACH den BPT/CEV-Namensmustern pruefen, damit ein
+    # zufaellig kollidierender Code (z.B. "MGER2025" fuer die echte CEV EuroBeachVolley
+    # in Duesseldorf) nicht faelschlich als Nationaltour-Stopp durchrutscht.
+    nat_m = NATIONAL_TOUR_RE.match(code)
+    if nat_m and not NOISE_RE.search(n) and not AGE_RE.search(n):
+        city = NATIONAL_NAME_PREFIX_RE.sub("", n).strip() or n.strip()
+        return (NATIONAL_ORG[nat_m.group(1)], "National", city)
     # Alte FIVB-Turnierform (vor 2023): kein "BPT"-Tag, Name = reiner Ortsname.
     # Unterscheidung Top-Tour vs. Zonal/Satellit/Quali ueber Hauptfeldgroesse,
     # da der Turniername selbst keine Stufe mehr angibt.
@@ -244,7 +258,7 @@ def main():
         "Fields='No Code Name CountryName StartDateMainDraw EndDateMainDraw Gender Type Season NbTeamsMainDraw'>"
         f"<Filter Season='{SEASON}'/></Request>").iter("BeachTournament")]
     events = build_events(tour)
-    print(f"[generate] {len(events)} relevante Events (FIVB+CEV)")
+    print(f"[generate] {len(events)} relevante Events (FIVB+CEV+ÖVV/DVV)")
 
     # Ergebnisse fuer gespielte/laufende Events – Herren- UND Damen-Turnier je Event
     todo = []
