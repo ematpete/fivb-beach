@@ -249,9 +249,10 @@
   .bkt.dko .rnd:not(:first-child) .cell .bx::before,
   .bkt.dko .rnd.binary .cell:nth-child(odd)::before{content:none;}
   .bkt.dko .dko-center{flex:1 0 210px;min-width:210px;}
-  .bkt.dko .dko-final{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:10px;}
-  .bkt.dko .dko-arrow{color:var(--faint);font-size:15px;}
-  .bkt.dko .dko-final .bx{margin:0 12px;min-width:180px;}
+  .bkt.dko .dko-sublab{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);text-align:center;margin-bottom:3px;}
+  .bkt.dko .dko-final-lab{color:var(--gold);font-weight:700;}
+  .bkt.dko .dko-final-cell .bx{border-color:color-mix(in srgb,var(--gold) 45%,var(--line));}
   .bx.empty{border:1px dashed var(--line);background:transparent;box-shadow:none;min-height:34px;opacity:.5;}
   .rnd .rlab .rsub{color:#8A6FE0;}
   .bx{position:relative;margin:5px 12px;background:var(--surface);border:1px solid var(--line);
@@ -1708,11 +1709,16 @@ function renderDoubleKO(matches, repechageCodes){
     .filter(rc=>!['F1','SF','F3','BM'].includes(rc) && !repechageCodes.includes(rc))
     .sort((a,b)=>rrOf(b)-rrOf(a));  // fruehste/flachste Runde zuerst -> ganz links
   const repSorted=repechageCodes.slice().sort((a,b)=>rrOf(a)-rrOf(b));  // tiefste (naeher am Halbfinale) zuerst -> naeher an der Mitte
+  // Finale zwischen die beiden Halbfinal-Boxen setzen (nicht darunter) — jede Box mit
+  // eigener Beschriftung, damit auf einen Blick klar ist, was Halbfinale und was Finale ist.
   const F1=matches.filter(m=>m.rc==='F1'), SF=matches.filter(m=>m.rc==='SF');
+  const sfBox = m => `<div class="cell"><div class="dko-sublab">Halbfinale</div>${bracketBox(m)}</div>`;
   const centerCol = `<div class="rnd dko-center"><div class="rlab">Halbfinale &amp; Finale</div><div class="cells">`
-    + SF.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div>`
-    + (F1.length ? `<div class="dko-final"><span class="dko-arrow">↓</span>${F1.map(bracketBox).join('')}</div>` : '')
-    + `</div>`;
+    + (SF[0] ? sfBox(SF[0]) : '')
+    + (F1[0] ? `<div class="cell dko-final-cell"><div class="dko-sublab dko-final-lab">🏆 Finale</div>${bracketBox(F1[0])}</div>` : '')
+    + (SF[1] ? sfBox(SF[1]) : '')
+    + SF.slice(2).map(sfBox).join('')
+    + `</div></div>`;
   const bm=matches.find(m=>m.rc==='F3'||m.rc==='BM');
   const bronze = bm ? `<div class="bkt-bronze"><div class="blab">Spiel um Platz 3</div>${bracketBox(bm)}</div>` : '';
   return `<div class="bkt-scroll"><div class="bkt dko">${mainCodes.map(col).join('')}${centerCol}${repSorted.map(col).join('')}</div></div>${bronze}`;
