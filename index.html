@@ -1299,7 +1299,35 @@ function setView(v){
     body.scrollTop=0;
     return;
   }
-  body.innerHTML = v==='bracket' ? renderBracket() : v==='seeds' ? renderSeedList() : renderList();
+  if(v==='seeds'){
+    const no=cur.no;
+    const pointsByKeyFrom = data => {
+      const map={}; data.rows.forEach(t=>{ map[seedKey(t.p1no,t.p2no)]=t.points; }); return map;
+    };
+    const seedHtml=renderSeedList(entryTiersCache[no] ? pointsByKeyFrom(entryTiersCache[no]) : null);
+    if(seedHtml){
+      body.innerHTML=seedHtml; body.scrollTop=0;
+      // Punkte im Hintergrund nachladen (falls noch nicht im Cache) und Tabelle damit ergaenzen.
+      if(!entryTiersCache[no]){
+        fetchEntryTiers(no).then(data=>{
+          if(cur && cur.no===no && drawerView==='seeds') body.innerHTML = renderSeedList(pointsByKeyFrom(data));
+        }).catch(()=>{});
+      }
+      return;
+    }
+    // Kein echter Draw vorhanden — vorlaeufige Meldeliste nach Einstiegspunkten laden
+    body.innerHTML = entryTiersCache[no] ? renderEntryTiers(entryTiersCache[no]) : '<p class="h2hNote">Lädt Meldeliste …</p>';
+    if(!entryTiersCache[no]){
+      fetchEntryTiers(no).then(data=>{
+        if(cur && cur.no===no && drawerView==='seeds') body.innerHTML = renderEntryTiers(data);
+      }).catch(()=>{
+        if(cur && cur.no===no && drawerView==='seeds') body.innerHTML = '<p class="h2hNote">Meldeliste konnte nicht geladen werden.</p>';
+      });
+    }
+    body.scrollTop=0;
+    return;
+  }
+  body.innerHTML = v==='bracket' ? renderBracket() : renderList();
   body.scrollTop=0;
 }
 
@@ -1435,11 +1463,13 @@ function buildSeedList(matches){
   for(const m of matches){
     for(const side of ['a','b']){
       const name=m[side]; if(!name) continue;
-      const t=teams.get(name) || {name, seed:null, fed:null, matches:[]};
+      const t=teams.get(name) || {name, seed:null, fed:null, p1no:null, p2no:null, matches:[]};
       const seed = side==='a' ? m.sda : m.sdb;
       const fedc = side==='a' ? m.ca : m.cb;
+      const pnos = side==='a' ? m.pa : m.pb;
       if(seed) t.seed=seed;
       if(fedc) t.fed=fedc;
+      if(pnos && pnos.length===2){ t.p1no=pnos[0]; t.p2no=pnos[1]; }
       t.matches.push({m,side});
       teams.set(name,t);
     }
@@ -1465,13 +1495,73 @@ function buildSeedList(matches){
   rows.sort((a,b)=>(a.seed||999)-(b.seed||999) || a.name.localeCompare(b.name));
   return rows;
 }
-function renderSeedList(){
+const seedKey = (p1no,p2no) => [p1no,p2no].filter(Boolean).sort().join(',');
+const POINTS_RULE_NOTE = 'Punkte: beste 3 von 4 Volleyball World Beach Pro Tour- bzw. WM-Turnieren '
+  +'der letzten 365 Tage (FIVB-Regel).';
+function renderSeedList(pointsByKey){
   const rows=buildSeedList(cur.matches);
-  if(!rows.length) return '<div class="bkt-note">Für dieses Turnier liegt keine Setzliste vor.</div>';
-  const trs=rows.map(t=>`<tr><td class="pos">${t.seed||'–'}</td><td class="nm">${t.name} ${fed(t.fed)}</td>
-    <td class="entry">${t.entry}</td><td class="seedres ${t.cls}">${t.result}</td></tr>`).join('');
-  return `<table class="standings"><thead><tr><th class="n">Setzung</th><th>Team</th><th>Start</th><th>Stand</th></tr></thead>
-    <tbody>${trs}</tbody></table>`;
+  if(!rows.length) return null;  // kein echter Draw vorhanden — setView faellt auf die Meldeliste zurueck
+  const trs=rows.map(t=>{
+    const pts = pointsByKey && pointsByKey[seedKey(t.p1no,t.p2no)];
+    return `<tr><td class="pos">${t.seed||'–'}</td><td class="nm">${t.name} ${fed(t.fed)}</td>
+    <td class="entry">${t.entry}</td><td class="n">${pts!=null?pts:'–'}</td><td class="seedres ${t.cls}">${t.result}</td></tr>`;
+  }).join('');
+  return `<table class="standings"><thead><tr><th class="n">Setzung</th><th>Team</th><th>Start</th>
+    <th class="n">Punkte (Einstieg)</th><th>Stand</th></tr></thead>
+    <tbody>${trs}</tbody></table>
+    <p class="bkt-note">${POINTS_RULE_NOTE}</p>`;
+}
+// Vorlaeufige Meldeliste (Hauptfeld/Quali/Reserve) aus allen gemeldeten Teams nach
+// Einstiegspunkten, solange FIVB noch keinen echten Draw mit Setzliste veroeffentlicht hat.
+// Naeherung: die tatsaechliche Zusammensetzung kann durch Wildcards/Verbandsquoten abweichen.
+const entryTiersCache={};
+async function fetchEntryTiers(no){
+  if(entryTiersCache[no]) return entryTiersCache[no];
+  const fields="No EntryPoints NoPlayer1 NoPlayer2 Player1FirstName Player1LastName "
+    +"Player2FirstName Player2LastName Player1FederationCode Player2FederationCode";
+  const teamXml=`<Request Type='GetBeachTeamList' Fields='${fields}'><Filter NoTournament='${no}'/></Request>`;
+  const tourXml=`<Request Type='GetBeachTournament' No='${no}' Fields='NbTeamsMainDraw NbTeamsQualification'/>`;
+  const [teamRes,tourRes]=await Promise.all([
+    fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',body:new URLSearchParams({Request:teamXml})}),
+    fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',body:new URLSearchParams({Request:tourXml})}),
+  ]);
+  if(!teamRes.ok||!tourRes.ok) throw new Error('VIS request failed');
+  const teamDoc=new DOMParser().parseFromString(await teamRes.text(),'application/xml');
+  const tourDoc=new DOMParser().parseFromString(await tourRes.text(),'application/xml');
+  if(teamDoc.querySelector('parsererror')||tourDoc.querySelector('parsererror')) throw new Error('VIS XML parse error');
+  const rows=[];
+  for(const el of teamDoc.getElementsByTagName('BeachTeam')){
+    const g=n=>el.getAttribute(n);
+    const points=numL(g('EntryPoints'));
+    if(points==null) continue;
+    rows.push({
+      points, p1no:g('NoPlayer1'), p2no:g('NoPlayer2'),
+      p1:`${g('Player1FirstName')||''} ${g('Player1LastName')||''}`.trim(),
+      p2:`${g('Player2FirstName')||''} ${g('Player2LastName')||''}`.trim(),
+      fed:g('Player1FederationCode')||g('Player2FederationCode')||'',
+    });
+  }
+  rows.sort((a,b)=>b.points-a.points);
+  const tEl=tourDoc.querySelector('BeachTournament');
+  const mainDraw=numL(tEl&&tEl.getAttribute('NbTeamsMainDraw'))||0;
+  const quali=numL(tEl&&tEl.getAttribute('NbTeamsQualification'))||0;
+  rows.forEach((t,i)=>{
+    t.pos=i+1;
+    t.tier = i<mainDraw ? 'Hauptfeld' : i<mainDraw+quali ? 'Quali' : 'Reserve';
+  });
+  const result={rows,mainDraw,quali};
+  entryTiersCache[no]=result;
+  return result;
+}
+function renderEntryTiers({rows,mainDraw,quali}){
+  if(!rows.length) return '<div class="bkt-note">Für dieses Turnier liegt noch keine Meldeliste vor.</div>';
+  const trs=rows.map(t=>`<tr><td class="pos">${t.pos}</td><td class="nm">${t.p1}/${t.p2} ${fed(t.fed)}</td>
+    <td class="n">${t.points!=null?t.points:'–'}</td><td class="entry">${t.tier}</td></tr>`).join('');
+  return `<table class="standings"><thead><tr><th class="n">#</th><th>Team</th>
+    <th class="n">Punkte (Einstieg)</th><th>Stand</th></tr></thead><tbody>${trs}</tbody></table>
+    <p class="bkt-note">Vorläufige Meldeliste nach aktuellen Einstiegspunkten (${mainDraw} Hauptfeld-,
+    ${quali} Quali-Plätze) — Wildcards und Verbandsquoten können die tatsächliche Zusammensetzung noch
+    verschieben. Wird durch die echte Setzliste ersetzt, sobald FIVB den Draw veröffentlicht.<br>${POINTS_RULE_NOTE}</p>`;
 }
 
 function bracketBox(m){
