@@ -1568,9 +1568,24 @@ function renderBracket(){
       + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div>`
       + (isLast ? bronze : '') + `</div>`;
   });
-  const note = skipped.length
-    ? `<div class="bkt-note">Weitere Zubringer aus ${skipped.map(rc=>roundLabel(rc)).join(', ')} sind in den Boxen als „Sieger #Nr." vermerkt.</div>`
-    : '';
+  // Manche Turniere (z.B. DVV-Nationaltour) nutzen ein Format mit Trost-/Platzierungsrunden
+  // fuer Verlierer (z.B. "R7"/"R5" = Verlierer wird 7./5."), die zurueck in die Haupt-Kette
+  // fuehren koennen. computeChainOrder kennt nur die reine Halbierungskette und laesst
+  // solche Runden komplett weg — statt sie stillschweigend zu verschlucken, hier vermerken.
+  const bracketCodes=new Set(['R64','R48','R32','R24','R16','QF','SF','F1','F3','BM', ...(feederRc?[feederRc]:[]), ...skipped]);
+  // Nur Runden mit erkennbarer Platzierungs-/Trostrunden-Bezeichnung (z.B. "Loser are ranked
+  // 7th") melden — andere unbekannte Codes (z.B. ungerade Zwischenrunden-Groessen wie
+  // "Round of 12") sind meist normale KO-Runden, die computeChainOrder nur nicht einordnet,
+  // aber keine echte Verlierer-Rueckfuehrung, die im Baum fehlen wuerde.
+  const repechageCodes=[...new Set(matches.map(m=>m.rc))].filter(rc=>{
+    if(bracketCodes.has(rc) || isQuali(rc) || isPool(rc)) return false;
+    const rn=(matches.find(m=>m.rc===rc)||{}).rn||'';
+    return /ranked|loser/i.test(rn);
+  });
+  const note = (skipped.length ? `<div class="bkt-note">Weitere Zubringer aus ${skipped.map(rc=>roundLabel(rc)).join(', ')} sind in den Boxen als „Sieger #Nr." vermerkt.</div>` : '')
+    + (repechageCodes.length ? `<div class="bkt-note">Dieses Turnier hat zusätzlich Platzierungs-/Trostrunden für Verlierer
+        (${repechageCodes.map(rc=>roundLabel(rc,(matches.find(m=>m.rc===rc)||{}).rn)).join(', ')}),
+        die sich hier nicht als Baum darstellen lassen — Details dazu in der Listenansicht.</div>` : '');
   return `<div class="bkt-scroll"><div class="bkt">${cols}</div></div>${note}`;
 }
 function closeDrawer(){
