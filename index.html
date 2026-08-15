@@ -811,9 +811,15 @@ function buildH2H(m){
   if(!enc.length) return '';
   let wa=0,wb=0;
   enc.forEach(({mm})=>{ const w=(+mm.sa>+mm.sb)?mm.a:mm.b; if(w===m.a) wa++; else wb++; });
+  // Satzstand immer aus Sicht von m.a:m.b zeigen — in der Historie stehen Teams je
+  // nach Match mal als a, mal als b, sonst passt die Zeile nicht zur Gesamtbilanz oben.
   const rows=enc.sort((x,y)=>(y.mm.date||'').localeCompare(x.mm.date||''))
-    .map(({mm,city})=>`<div class="h2r${mm===m?' cur':''}"><span class="h2d">${mm.date||''}</span>
-        <span class="h2c">${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${mm.sa}:${mm.sb}</span></div>`)
+    .map(({mm,city})=>{
+      const flipped=mm.a!==m.a;
+      const sa=flipped?mm.sb:mm.sa, sb=flipped?mm.sa:mm.sb;
+      return `<div class="h2r${mm===m?' cur':''}"><span class="h2d">${mm.date||''}</span>
+        <span class="h2c">${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${sa}:${sb}</span></div>`;
+    })
     .join('');
   const note = allSeasonsLoaded ? 'alle Saisonen' : 'lädt weitere Saisonen …';
   return `<div class="h2h"><div class="h2title">Head-to-Head <span class="h2note">(${note})</span></div>
