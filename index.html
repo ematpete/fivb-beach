@@ -975,9 +975,9 @@ function placementInTournament(matches, teamName){
 // (einzige Stufen, die fuer Entry/Seeding Points zaehlen) innerhalb der letzten 365 Tage, mit
 // Platzierung und Punkten je Turnier — beste 3 davon sind die tatsaechlich gezaehlten.
 function playerPointsBreakdown(playerNo, asOfDate){
-  // FIVB berechnet Entry Points 28 Tage vor Turnierstart (Elite16-Hauptfeld: Seeding 14 Tage
-  // vorher) — nicht "heute". Das Referenzdatum kommt daher vom aufrufenden Turnier, sonst
-  // stimmt "letzte 4 Turniere" nicht mit dem tatsaechlich angezeigten Punktestand ueberein.
+  // FIVB friert Entry Points auf den 1. des Monats des Meldeschlusses ein — nicht "heute".
+  // Das Referenzdatum kommt daher vom aufrufenden Turnier, sonst stimmt "letzte 4 Turniere"
+  // nicht mit dem tatsaechlich angezeigten Punktestand ueberein.
   const asOf = asOfDate ? new Date(asOfDate) : new Date();
   const byTournament=new Map();
   for(const [year,sd] of Object.entries(seasonCache)){
@@ -1678,7 +1678,7 @@ async function fetchEntryTiers(no){
   const fields="No EntryPoints NoPlayer1 NoPlayer2 Player1FirstName Player1LastName "
     +"Player2FirstName Player2LastName Player1FederationCode Player2FederationCode";
   const teamXml=`<Request Type='GetBeachTeamList' Fields='${fields}'><Filter NoTournament='${no}'/></Request>`;
-  const tourXml=`<Request Type='GetBeachTournament' No='${no}' Fields='NbTeamsMainDraw NbTeamsQualification'/>`;
+  const tourXml=`<Request Type='GetBeachTournament' No='${no}' Fields='NbTeamsMainDraw NbTeamsQualification Deadline'/>`;
   const [teamRes,tourRes]=await Promise.all([
     fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',body:new URLSearchParams({Request:teamXml})}),
     fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',body:new URLSearchParams({Request:tourXml})}),
@@ -1703,11 +1703,12 @@ async function fetchEntryTiers(no){
   const tEl=tourDoc.querySelector('BeachTournament');
   const mainDraw=numL(tEl&&tEl.getAttribute('NbTeamsMainDraw'))||0;
   const quali=numL(tEl&&tEl.getAttribute('NbTeamsQualification'))||0;
+  const deadline=(tEl&&tEl.getAttribute('Deadline'))||null;
   rows.forEach((t,i)=>{
     t.pos=i+1;
     t.tier = i<mainDraw ? 'Hauptfeld' : i<mainDraw+quali ? 'Quali' : 'Reserve';
   });
-  const result={rows,mainDraw,quali};
+  const result={rows,mainDraw,quali,deadline};
   entryTiersCache[no]=result;
   return result;
 }
@@ -2060,10 +2061,21 @@ function renderPointsBreakdownBody(p1no, p2no, teamName, asOfDate){
 function openPointsBreakdown(p1no, p2no, teamName){
   document.getElementById('ptTitle').innerHTML = `Punkte-Aufschlüsselung<b>${teamName}</b>`;
   const body=document.getElementById('ptBody');
-  // FIVB berechnet die angezeigten Einstiegspunkte 28 Tage vor Turnierstart, nicht "heute" —
-  // Referenzdatum entsprechend setzen, sonst passt "beste 3 von 4" nicht zum Anzeigewert.
-  const asOf=new Date(cur.ev.start); asOf.setDate(asOf.getDate()-28);
-  const asOfStr=asOf.toISOString().slice(0,10);
+  // FIVB friert die angezeigten Einstiegspunkte auf den 1. des Monats ein, in den der Meldeschluss
+  // (Deadline) faellt — nicht "heute" und nicht die Deadline selbst. Empirisch verifiziert an
+  // mehreren Turnieren: erst mit diesem Referenzdatum stimmt "beste 3 von 4" mit dem tatsaechlich
+  // angezeigten Punktestand ueberein.
+  // In UTC rechnen: ein lokal konstruiertes Datum ueber toISOString() auszugeben wuerde in
+  // Zeitzonen oestlich von UTC (z.B. MESZ) faelschlich einen Tag zurueckfallen.
+  const cachedDeadline = entryTiersCache[cur.no]?.deadline;
+  let asOfStr;
+  if(cachedDeadline){
+    const dl=new Date(cachedDeadline);
+    asOfStr=`${dl.getUTCFullYear()}-${String(dl.getUTCMonth()+1).padStart(2,'0')}-01`;
+  } else {
+    const asOf=new Date(cur.ev.start); asOf.setUTCDate(asOf.getUTCDate()-28);
+    asOfStr=asOf.toISOString().slice(0,10);
+  }
   if(!allSeasonsLoaded){
     body.innerHTML='<p class="h2hNote">Lädt Turnierhistorie …</p>';
     ensureAllSeasonsLoaded().then(()=>{
