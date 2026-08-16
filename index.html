@@ -284,7 +284,7 @@
   .mmhead b{display:block;font-family:var(--sans);font-size:17px;letter-spacing:-.01em;text-transform:none;
     color:var(--ink);margin-top:4px;}
   .mmodal .mdetail{margin:0;}
-  .pmodal{z-index:90;width:min(430px,92vw);}
+  .pmodal{z-index:90;width:min(540px,92vw);}
   #pscrim{z-index:80;}
   /* overflow:visible statt geerbtem overflow-y:auto: .mmodal wuerde sonst jedes
      ueberstehende Element clippen, auch das absolut positionierte Sugg-Dropdown.
@@ -342,7 +342,7 @@
   .pcname{font-size:19px;letter-spacing:-.01em;color:var(--ink);text-transform:none;}
   .pcname b{font-weight:800;}
   .lastmatches{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);}
-  .lastm{display:grid;grid-template-columns:26px 64px 1fr auto;gap:8px;align-items:center;
+  .lastm{display:grid;grid-template-columns:26px 64px 1fr;gap:8px;align-items:center;
     padding:5px 4px;border-radius:6px;font-size:12px;cursor:pointer;}
   .lastm:hover{background:var(--surface-2);}
   .lm-res{font-family:var(--mono);font-weight:700;font-size:10.5px;text-align:center;
@@ -353,8 +353,8 @@
   .lm-res.out{background:var(--faint);}
   .lm-date{font-family:var(--mono);color:var(--faint);font-size:11px;}
   .lm-opp{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
-  .lm-score{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted);}
-  .lm-city{grid-column:2/-1;font-size:11px;color:var(--faint);margin-top:-3px;}
+  .lm-city{grid-column:2/-1;font-size:11px;color:var(--faint);margin-top:-3px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .bx .brow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:2px 0;font-size:12.5px;}
   .bx .brow+.brow{border-top:1px dashed var(--line);}
   .bx .brow.win .bn{font-weight:700;color:var(--ink);}
@@ -1085,8 +1085,9 @@ function personalTournamentResults(playerNo, limit=5){
     // entscheidendes Match dieses Turniers (Finale bei Champion, sonst das Ausscheiden) fuer
     // Gegner+Ergebnis aus Sicht des gesuchten Spielers.
     const lm=row.lastMatch, lmOpp=lm?(lm.side==='a'?lm.m.b:lm.m.a):null,
-      lmScore=lm?(lm.side==='a'?`${lm.m.sa}:${lm.m.sb}`:`${lm.m.sb}:${lm.m.sa}`):null;
-    rows.push({tno,season:year,date:ev.start,city,place:row.place,cls:row.cls,result:row.result,lmOpp,lmScore});
+      lmScore=lm?(lm.side==='a'?`${lm.m.sa}:${lm.m.sb}`:`${lm.m.sb}:${lm.m.sa}`):null,
+      lmRound=lm?lm.m.rc:null;
+    rows.push({tno,season:year,date:ev.start,city,place:row.place,cls:row.cls,result:row.result,lmRound,lmOpp,lmScore});
   }
   rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return rows.slice(0,limit);
@@ -1095,14 +1096,19 @@ function renderLastMatches(playerNo){
   if(!allSeasonsLoaded) return '<p class="h2hNote">Lädt Spielverlauf …</p>';
   const res=personalTournamentResults(playerNo,5);
   if(!res.length) return '';
-  const rows=res.map(({tno,season,date,city,place,cls,result,lmOpp,lmScore})=>`<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
+  const rows=res.map(({tno,season,date,city,place,cls,result,lmRound,lmOpp,lmScore})=>{
+    // Bei Ausscheiden ist die Kurzform (Runden-Code + Platz) griffiger als der volle Text
+    // "Aus: Viertelfinale" — Champion/Bronze/aktiv behalten ihre eigene Bezeichnung.
+    const roundText = cls==='out' && lmRound ? `${lmRound} · ${place}. Platz` : result;
+    const detail = lmOpp ? `Letztes Spiel: vs ${lmOpp}${lmScore?` ${lmScore}`:''} · ${city}` : city;
+    return `<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
         aria-label="Ergebnis ${city} öffnen">
       <span class="lm-res ${cls}">${place?`${place}.`:'–'}</span>
       <span class="lm-date">${date||''}</span>
-      <span class="lm-opp">${result}${lmOpp?` · vs ${lmOpp}`:''}</span>
-      ${lmScore?`<span class="lm-score">${lmScore}</span>`:''}
-      <span class="lm-city">${city}</span>
-    </div>`).join('');
+      <span class="lm-opp">${roundText}</span>
+      <span class="lm-city">${detail}</span>
+    </div>`;
+  }).join('');
   return `<div class="lastmatches"><div class="h2title">Letzte Turnierergebnisse</div>${rows}</div>`;
 }
 document.getElementById('pmBody').addEventListener('click', e=>{
