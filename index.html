@@ -1983,7 +1983,7 @@ document.addEventListener('keydown',e=>{
 
 // ---- Spieler-Vergleich: Head-to-Head zweier Einzelspieler:innen, unabhaengig vom Team ----
 const h2hScrim=document.getElementById('h2hscrim'), h2hModal=document.getElementById('h2hModal');
-let h2hPickA=null, h2hPickB=null, h2hPlayerIndex=null;
+let h2hPickA=null, h2hPickB=null, h2hPlayerIndex=null, h2hMetaIndex=null;
 function buildPlayerIndex(){
   const idx={};
   for(const sd of Object.values(seasonCache))
@@ -1991,7 +1991,33 @@ function buildPlayerIndex(){
       if(!idx[no]) idx[no]=p;
   return idx;
 }
+// Aktivitaet (Datum des juengsten erfassten Matches) + Geschlecht pro Spieler, aus den Matches
+// selbst abgeleitet (kein eigenes Feld im Profil) — fuer Sortierung/Filter der H2H-Suche.
+function buildPlayerMetaIndex(){
+  const activity={}, gender={};
+  for(const sd of Object.values(seasonCache)){
+    for(const [tno,ms] of Object.entries(sd.results||{})){
+      const ev=eventForTournament(sd,tno);
+      const g = ev && ev.M && ev.M.no===tno ? 'M' : ev && ev.W && ev.W.no===tno ? 'W' : null;
+      for(const m of ms){
+        if(!isFinished(m)) continue;
+        const nos=[...(m.pa||[]),...(m.pb||[])].map(String);
+        for(const no of nos){
+          if(!activity[no] || m.date>activity[no]) activity[no]=m.date;
+          if(g && !gender[no]) gender[no]=g;
+        }
+      }
+    }
+  }
+  return {activity, gender};
+}
 const playerLabel = p => `${p.fn||''} ${p.ln||''}`.trim() || '—';
+// Sonderzeichen, die NFKD nicht in Basisbuchstabe+Akzent zerlegt (ø/æ/ß sind eigene Buchstaben,
+// keine akzentuierten Varianten) — fuer eine akzent-unabhaengige Suche (z.B. "sorum" -> "Sørum").
+const CHAR_FOLD={'ø':'o','Ø':'O','æ':'ae','Æ':'AE','œ':'oe','Œ':'OE','ð':'d','Ð':'D',
+  'þ':'th','Þ':'Th','ł':'l','Ł':'L','đ':'d','Đ':'D','ß':'ss'};
+const foldText = s => (s||'').replace(/[øØæÆœŒðÐþÞłŁđĐß]/g, c=>CHAR_FOLD[c]||c)
+  .normalize('NFKD').replace(/[\u0300-\u036f]/g,'');
 function personalEncounters(noA,noB){
   const out=[];
   for(const sd of Object.values(seasonCache)){
@@ -2043,11 +2069,21 @@ function h2hPickedHtml(p,onClearId){
 function wireH2HSearch(side){
   const input=document.getElementById(`h2hSearch${side}`), sugg=document.getElementById(`h2hSugg${side}`);
   input.addEventListener('input',()=>{
-    const q=input.value.trim().toLowerCase();
+    const q=foldText(input.value.trim()).toLowerCase();
     if(q.length<2 || !h2hPlayerIndex){ sugg.innerHTML=''; return; }
     const other = side==='A' ? h2hPickB : h2hPickA;
+    const activity = (h2hMetaIndex&&h2hMetaIndex.activity) || {};
+    const gender = (h2hMetaIndex&&h2hMetaIndex.gender) || {};
+    // Ist bereits eine Seite gewaehlt, nur passendes Geschlecht vorschlagen (Herren-Auswahl ->
+    // nur Herren auf der anderen Seite, und umgekehrt).
+    const otherGender = other ? gender[other.no] : null;
     const hits=Object.entries(h2hPlayerIndex)
-      .filter(([no,p])=> (!other||other.no!==no) && `${p.fn||''} ${p.ln||''}`.toLowerCase().includes(q))
+      .filter(([no,p])=> (!other||other.no!==no)
+        && (!otherGender || gender[no]===otherGender)
+        && foldText(`${p.fn||''} ${p.ln||''}`).toLowerCase().includes(q))
+      // aktivere/juengere Spieler:innen zuerst — grober Ersatz fuer "besser gerankt",
+      // da wir keine laufende Weltrangliste je Spieler:in vorliegen haben.
+      .sort((a,b)=>(activity[b[0]]||'').localeCompare(activity[a[0]]||''))
       .slice(0,8);
     sugg.innerHTML=hits.map(([no,p])=>
       `<div class="h2hSuggItem" data-no="${no}">${playerLabel(p)} ${p.fed?`(${p.fed})`:''}</div>`).join('');
@@ -2073,7 +2109,8 @@ function wireH2HSearch(side){
 wireH2HSearch('A'); wireH2HSearch('B');
 function openH2HCompare(){
   h2hPlayerIndex = buildPlayerIndex();
-  ensureAllSeasonsLoaded().then(()=>{ h2hPlayerIndex=buildPlayerIndex(); });
+  h2hMetaIndex = buildPlayerMetaIndex();
+  ensureAllSeasonsLoaded().then(()=>{ h2hPlayerIndex=buildPlayerIndex(); h2hMetaIndex=buildPlayerMetaIndex(); });
   h2hScrim.classList.add('open'); h2hModal.classList.add('open'); h2hModal.setAttribute('aria-hidden','false');
   document.getElementById('h2hSearchA').focus();
 }
