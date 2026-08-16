@@ -425,10 +425,12 @@
   .elim-collapsed summary::-webkit-details-marker{display:none;}
   .elim-collapsed summary::before{content:'▸ ';color:var(--faint);}
   .elim-collapsed[open] summary::before{content:'▾ ';}
-  .match{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;
+  .match{display:grid;grid-template-columns:60px 1fr;gap:8px;align-items:center;
     padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
   .match:last-child{border-bottom:none;}
-  .match .mt{font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;}
+  .match .mt{font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;
+    min-width:0;overflow:hidden;}
+  .match .mt .t-venue{overflow:hidden;text-overflow:ellipsis;}
   .match .teams{display:flex;flex-direction:column;gap:3px;min-width:0;}
   .match .team{display:grid;grid-template-columns:1fr auto 15px;gap:10px;align-items:center;}
   .match .team.win .tn{font-weight:700;}
@@ -2205,6 +2207,7 @@ function applyData(j){
   DATA=j; resultNos=new Set(Object.keys(DATA.results));
   DATA.events.forEach((e,i)=>e._idx=i);
   render(); updateStand(); updateMeta();
+  ensureTopLivePoll();
 }
 async function loadSeason(y, silent){
   const btn=document.getElementById('refreshbtn');
@@ -2230,10 +2233,32 @@ async function loadSeason(y, silent){
 document.getElementById('refreshbtn').addEventListener('click',()=>loadSeason(season, false));
 document.getElementById('seasonSel').addEventListener('change', e=>loadSeason(+e.target.value, false));
 
+// "Als Naechstes" in der Hauptliste wird nur beim Laden gerendert — die generierte
+// data/<jahr>.json hinkt live laufenden Turnieren bis zu ~1h hinterher (Cron-Intervall), daher
+// hier direkt bei VIS nachfragen, solange irgendein Event als "live" gilt, sonst bleiben
+// laengst gespielte Matches faelschlich als "naechstes Match" stehen.
+let topLivePollTimer=null;
+async function refreshTopLiveMatches(){
+  const liveNow=DATA.events.filter(e=>e.status==='live');
+  if(!liveNow.length){ clearInterval(topLivePollTimer); topLivePollTimer=null; return; }
+  if(document.hidden) return;
+  const nos=[];
+  for(const e of liveNow){ if(e.M) nos.push(e.M.no); if(e.W) nos.push(e.W.no); }
+  await Promise.all(nos.map(async no=>{
+    try{ const fresh=await fetchLiveMatches(no); if(fresh.length) DATA.results[no]=fresh; }catch(err){ /* naechster Tick versucht es erneut */ }
+  }));
+  render();
+}
+function ensureTopLivePoll(){
+  if(topLivePollTimer || !DATA.events.some(e=>e.status==='live')) return;
+  topLivePollTimer=setInterval(refreshTopLiveMatches, 30000);
+}
+
 // ---- Init ----
 buildSeasonSelect();
 DATA.events.forEach((e,i)=>e._idx=i);
 render(); updateStand(); updateMeta();
+ensureTopLivePoll();
 // erst die aktuelle Saison-Datei still nachziehen (applyData schliesst sonst einen per
 // Hash bereits geoeffneten Drawer wieder), danach ggf. Turnier aus dem Link-Hash oeffnen
 loadSeason(season, true).then(openFromHash);
