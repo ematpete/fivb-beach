@@ -291,6 +291,14 @@
      Die Gesamthoehe bleibt durch .h2hCompare .h2list (eigener Scroll) begrenzt. */
   .h2hmodal{z-index:95;width:min(640px,92vw);max-height:none;overflow:visible;}
   #h2hscrim{z-index:85;}
+  .wtrmodal{z-index:95;width:min(640px,92vw);}
+  #wtrscrim{z-index:85;}
+  .wtrmodal #wtrToggle{margin-bottom:14px;}
+  .wtr-team{cursor:pointer;color:var(--ink);}
+  .wtr-team:hover{color:var(--accent);text-decoration:underline;}
+  .wtr-profile-line{margin:8px 0 2px;padding:8px 10px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:8px;font-size:12.5px;color:var(--muted);}
+  .wtr-profile-line b{color:var(--ink);}
   .h2hpicker{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;}
   .h2hside{flex:1;min-width:0;position:relative;}
   .h2hside input{width:100%;box-sizing:border-box;font-family:var(--sans);font-size:14px;
@@ -506,6 +514,7 @@
     <div class="hdr-actions">
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
       <button class="themebtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
+      <button class="themebtn" id="wtrOpenBtn" type="button" title="Offizielle FIVB-Weltrangliste">🏆 Weltrangliste</button>
       <span class="stand" id="stand"></span>
       <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden">⟳ Aktualisieren</button>
       <button class="themebtn" id="themebtn" type="button">◑ Theme</button>
@@ -611,6 +620,17 @@
   <button class="mclose" id="ptClose" type="button" aria-label="Schließen">✕</button>
   <div class="mmhead" id="ptTitle">Punkte-Aufschlüsselung</div>
   <div id="ptBody"></div>
+</div>
+
+<div class="mscrim" id="wtrscrim"></div>
+<div class="mmodal wtrmodal" id="wtrModal" role="dialog" aria-modal="true" aria-labelledby="wtrTitle" aria-hidden="true">
+  <button class="mclose" id="wtrClose" type="button" aria-label="Schließen">✕</button>
+  <div class="mmhead" id="wtrTitle">🏆 Weltrangliste</div>
+  <div id="wtrToggle" class="vtoggle" role="tablist">
+    <button class="vt" data-g="M" role="tab" aria-pressed="true" type="button">Herren</button>
+    <button class="vt" data-g="W" role="tab" aria-pressed="false" type="button">Damen</button>
+  </div>
+  <div id="wtrBody"></div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -969,7 +989,15 @@ function buildPlayerCard(no){
     p.yb?['Beach seit', p.yb]:null,
     p.tm?['Team', p.tm]:null,
   ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-  return `<div class="mdmeta">${rows}</div><div id="pmLast">${renderLastMatches(no)}</div>`;
+  return `<div class="mdmeta">${rows}</div><div id="pmWtr"></div><div id="pmLast">${renderLastMatches(no)}</div>`;
+}
+// Zeile mit offiziellem Weltranglisten-Platz + Preisgeld im Spielerprofil, falls die
+// Weltrangliste (M+W) schon geladen ist — sonst leer, wird nach dem Laden nachgetragen.
+function renderWorldTourLine(no){
+  const entry=findWorldTourEntry(no);
+  if(!entry) return '';
+  return `<div class="wtr-profile-line">🏆 Weltrangliste: <b>#${rankDisplay(entry)}</b>
+    · ${entry.points!=null?`${entry.points} Punkte`:''} · ${fmtUsd(entry.earningsCents)} Preisgeld</div>`;
 }
 // Offizielle FIVB-Punktetabelle pro Athlet (Sport Operations Manual, Abschnitt 7 "Ranking
 // Points Breakdown Per Athlete"). Nur die Stufen, die laut Regelwerk fuer Entry/Seeding
@@ -1941,6 +1969,7 @@ document.addEventListener('keydown',e=>{
   else if(mmodal.classList.contains('open')) closeMatchModal();
   else if(h2hModal.classList.contains('open')) closeH2HCompare();
   else if(ptModal.classList.contains('open')) closePointsBreakdown();
+  else if(wtrModal.classList.contains('open')) closeWorldTourRanking();
   else closeDrawer();
 });
 document.getElementById('vtoggle').addEventListener('click',e=>{
@@ -1987,6 +2016,14 @@ function openPlayerCard(no){
       }
     });
   }
+  // Weltranglisten-Platz+Preisgeld nachladen (M+W, Geschlecht des Spielers ist uns hier nicht
+  // bekannt) und die Zeile im Profil nachtragen, sobald verfuegbar.
+  Promise.all(['M','W'].map(g=>fetchWorldTourRanking(g).catch(()=>[]))).then(()=>{
+    if(pmodal.classList.contains('open')){
+      const el=document.getElementById('pmWtr');
+      if(el) el.innerHTML=renderWorldTourLine(no);
+    }
+  });
 }
 function closePlayerCard(){ pscrim.classList.remove('open'); pmodal.classList.remove('open'); pmodal.setAttribute('aria-hidden','true'); }
 pscrim.addEventListener('click',closePlayerCard);
@@ -2137,6 +2174,90 @@ function closeH2HCompare(){ h2hScrim.classList.remove('open'); h2hModal.classLis
 document.getElementById('h2hOpenBtn').addEventListener('click', openH2HCompare);
 h2hScrim.addEventListener('click',closeH2HCompare);
 document.getElementById('h2hClose').addEventListener('click',closeH2HCompare);
+
+// Offizielle FIVB-Weltrangliste (GetBeachWorldTourRanking) — separat von unseren selbst
+// abgeleiteten Entry-Points: enthaelt die offizielle Rangpunktzahl UND echtes Preisgeld
+// (Feld ist in Hundertstel der Waehrung angegeben, siehe VIS-SDK-Doku "Amount"-Typ).
+// Braucht das Mehrfach-Request-Format <Requests><Request .../></Requests>, sonst 400.
+const worldTourRankingCache={};
+async function fetchWorldTourRanking(gender){
+  if(worldTourRankingCache[gender]) return worldTourRankingCache[gender];
+  const fields='Position Rank TeamName TeamFederationCode NbParticipations EarnedPointsTeam EarningsTotalTeam NoPlayer1 NoPlayer2';
+  const xml=`<Requests><Request Type='GetBeachWorldTourRanking' Gender='${gender}' Number='100' Fields='${fields}'/></Requests>`;
+  const r=await fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',body:new URLSearchParams({Request:xml})});
+  if(!r.ok) throw new Error('VIS request failed');
+  const doc=new DOMParser().parseFromString(await r.text(),'application/xml');
+  if(doc.querySelector('parsererror')) throw new Error('VIS XML parse error');
+  const rows=[];
+  for(const el of doc.getElementsByTagName('BeachWorldTourRankingEntry')){
+    const g=n=>el.getAttribute(n);
+    rows.push({
+      pos:numL(g('Position')), rank:numL(g('Rank')), name:g('TeamName')||'', fed:g('TeamFederationCode')||'',
+      participations:numL(g('NbParticipations')), points:numL(g('EarnedPointsTeam')),
+      earningsCents:numL(g('EarningsTotalTeam')), p1no:g('NoPlayer1'), p2no:g('NoPlayer2'),
+    });
+  }
+  rows.sort((a,b)=>(a.pos||999)-(b.pos||999));
+  worldTourRankingCache[gender]=rows;
+  return rows;
+}
+const fmtUsd = cents => cents==null ? '–' : `$${Math.round(cents/100).toLocaleString('de-DE')}`;
+// Bei Gleichstand liefert VIS den Rang als negative Zahl fuer alle bis auf das erste Team der
+// Gruppe (laut Doku "should not be displayed to the user") — daher Betrag statt Rohwert zeigen.
+const rankDisplay = entry => entry.rank!=null ? Math.abs(entry.rank) : entry.pos;
+function findWorldTourEntry(playerNo){
+  for(const rows of Object.values(worldTourRankingCache)){
+    const row=rows.find(r=>r.p1no===playerNo||r.p2no===playerNo);
+    if(row) return row;
+  }
+  return null;
+}
+function renderWorldTourRanking(gender, rows){
+  if(!rows.length) return '<p class="h2hNote">Für diese Rangliste liegt aktuell kein Stand vor.</p>';
+  const trs=rows.map(r=>`<tr><td class="pos">${rankDisplay(r)}</td>
+    <td class="nm"><span class="wtr-team" data-p1no="${r.p1no||''}" data-p2no="${r.p2no||''}" role="button" tabindex="0">${r.name}</span> ${fed(r.fed)}</td>
+    <td class="n">${r.points!=null?r.points:'–'}</td>
+    <td class="n">${fmtUsd(r.earningsCents)}</td>
+    <td class="n">${r.participations!=null?r.participations:'–'}</td></tr>`).join('');
+  return `<table class="standings"><thead><tr><th class="n">#</th><th>Team</th>
+    <th class="n">Punkte</th><th class="n">Preisgeld</th><th class="n">Turniere</th></tr></thead>
+    <tbody>${trs}</tbody></table>
+    <p class="bkt-note">Offizielle FIVB-Weltrangliste (GetBeachWorldTourRanking) — Preisgeld in US$,
+    Stand zum letzten von FIVB berechneten Zeitpunkt (nicht laufend aktualisiert wie unsere
+    Turnier-Einstiegspunkte).</p>`;
+}
+let wtrGender='M';
+const wtrScrim=document.getElementById('wtrscrim'), wtrModal=document.getElementById('wtrModal');
+function loadWorldTourRanking(gender){
+  const body=document.getElementById('wtrBody');
+  body.innerHTML='<p class="h2hNote">Lädt Weltrangliste …</p>';
+  fetchWorldTourRanking(gender).then(rows=>{
+    if(wtrGender===gender) body.innerHTML=renderWorldTourRanking(gender,rows);
+  }).catch(()=>{
+    if(wtrGender===gender) body.innerHTML='<p class="h2hNote">Weltrangliste konnte nicht geladen werden.</p>';
+  });
+}
+function openWorldTourRanking(){
+  wtrScrim.classList.add('open'); wtrModal.classList.add('open'); wtrModal.setAttribute('aria-hidden','false');
+  document.getElementById('wtrClose').focus();
+  loadWorldTourRanking(wtrGender);
+}
+function closeWorldTourRanking(){ wtrScrim.classList.remove('open'); wtrModal.classList.remove('open'); wtrModal.setAttribute('aria-hidden','true'); }
+document.getElementById('wtrOpenBtn').addEventListener('click', openWorldTourRanking);
+wtrScrim.addEventListener('click',closeWorldTourRanking);
+document.getElementById('wtrClose').addEventListener('click',closeWorldTourRanking);
+document.getElementById('wtrToggle').addEventListener('click',e=>{
+  const b=e.target.closest('.vt'); if(!b||b.getAttribute('aria-pressed')==='true') return;
+  wtrGender=b.dataset.g;
+  document.querySelectorAll('#wtrToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.g===wtrGender));
+  loadWorldTourRanking(wtrGender);
+});
+document.getElementById('wtrBody').addEventListener('click', e=>{
+  const t=e.target.closest('.wtr-team'); if(!t) return;
+  const no=t.dataset.p1no||t.dataset.p2no; if(!no) return;
+  closeWorldTourRanking();
+  openPlayerCard(no);
+});
 
 // Punkte-Aufschlüsselung: welche der letzten 4 zählenden Turniere je Spieler wie viele
 // Punkte brachten und welche 3 davon tatsächlich zählen.
