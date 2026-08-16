@@ -342,16 +342,17 @@
   .pcname{font-size:19px;letter-spacing:-.01em;color:var(--ink);text-transform:none;}
   .pcname b{font-weight:800;}
   .lastmatches{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);}
-  .lastm{display:grid;grid-template-columns:20px 64px 1fr auto;gap:8px;align-items:center;
+  .lastm{display:grid;grid-template-columns:26px 64px 1fr;gap:8px;align-items:center;
     padding:5px 4px;border-radius:6px;font-size:12px;cursor:pointer;}
   .lastm:hover{background:var(--surface-2);}
   .lm-res{font-family:var(--mono);font-weight:700;font-size:10.5px;text-align:center;
     border-radius:5px;padding:1px 0;color:#fff;}
-  .lm-res.w{background:var(--green);}
-  .lm-res.l{background:var(--faint);}
+  .lm-res.champ{background:var(--gold);}
+  .lm-res.bronze{background:var(--water);}
+  .lm-res.active{background:var(--green);}
+  .lm-res.out{background:var(--faint);}
   .lm-date{font-family:var(--mono);color:var(--faint);font-size:11px;}
   .lm-opp{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
-  .lm-score{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;}
   .lm-city{grid-column:2/-1;font-size:11px;color:var(--faint);margin-top:-3px;}
   .bx .brow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:2px 0;font-size:12.5px;}
   .bx .brow+.brow{border-top:1px dashed var(--line);}
@@ -1057,40 +1058,46 @@ function playerPointsBreakdown(playerNo, asOfDate){
   const total=withCounted.filter(r=>r.counted).reduce((s,r)=>s+r.points,0);
   return {rows:withCounted,total};
 }
-// letzte gespielten Matches eines Spielers, ueber alle geladenen Saisonen hinweg
-function personalMatches(playerNo, limit=5){
-  const out=[];
-  for(const sd of Object.values(seasonCache)){
+// letzte Turnierergebnisse eines Spielers (Endplatzierung je Turnier, nicht jedes Einzelmatch),
+// ueber alle geladenen Saisonen hinweg.
+function personalTournamentResults(playerNo, limit=5){
+  const byTournament=new Map();
+  for(const [year,sd] of Object.entries(seasonCache)){
     for(const [tno,ms] of Object.entries(sd.results||{})){
       for(const m of ms){
         if(!isFinished(m)) continue;
         const pa=(m.pa||[]).map(String), pb=(m.pb||[]).map(String);
-        if(pa.includes(playerNo)) out.push({m,side:'a',tno,season:sd.season,city:((sd.venues||{})[tno]||{}).city||''});
-        else if(pb.includes(playerNo)) out.push({m,side:'b',tno,season:sd.season,city:((sd.venues||{})[tno]||{}).city||''});
+        if(!pa.includes(playerNo) && !pb.includes(playerNo)) continue;
+        const key=`${year}|${tno}`;
+        if(!byTournament.has(key))
+          byTournament.set(key,{year:+year,tno,teamName:pa.includes(playerNo)?m.a:m.b});
       }
     }
   }
-  out.sort((a,b)=>(b.m.date||'').localeCompare(a.m.date||''));
-  return out.slice(0,limit);
+  const rows=[];
+  for(const {year,tno,teamName} of byTournament.values()){
+    const sd=seasonCache[year]; if(!sd) continue;
+    const ev=eventForTournament(sd,tno); if(!ev) continue;
+    const matches=sd.results[tno]; if(!matches) continue;
+    const row=derivedRanking(matches).find(t=>t.name===teamName); if(!row) continue;
+    const city=((sd.venues||{})[tno]||{}).city||ev.city||'';
+    rows.push({tno,season:year,date:ev.start,city,place:row.place,cls:row.cls,result:row.result});
+  }
+  rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return rows.slice(0,limit);
 }
 function renderLastMatches(playerNo){
   if(!allSeasonsLoaded) return '<p class="h2hNote">Lädt Spielverlauf …</p>';
-  const enc=personalMatches(playerNo,5);
-  if(!enc.length) return '';
-  const rows=enc.map(({m,side,tno,season,city})=>{
-    const won = side==='a' ? (+m.sa>+m.sb) : (+m.sb>+m.sa);
-    const opp = side==='a' ? m.b : m.a;
-    const score = side==='a' ? `${m.sa}:${m.sb}` : `${m.sb}:${m.sa}`;
-    return `<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
+  const res=personalTournamentResults(playerNo,5);
+  if(!res.length) return '';
+  const rows=res.map(({tno,season,date,city,place,cls,result})=>`<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
         aria-label="Ergebnis ${city} öffnen">
-      <span class="lm-res ${won?'w':'l'}">${won?'S':'N'}</span>
-      <span class="lm-date">${m.date||''}</span>
-      <span class="lm-opp">vs ${opp||'—'}</span>
-      <span class="lm-score">${score}</span>
+      <span class="lm-res ${cls}">${place?`${place}.`:'–'}</span>
+      <span class="lm-date">${date||''}</span>
+      <span class="lm-opp">${result}</span>
       <span class="lm-city">${city}</span>
-    </div>`;
-  }).join('');
-  return `<div class="lastmatches"><div class="h2title">Letzte Spiele</div>${rows}</div>`;
+    </div>`).join('');
+  return `<div class="lastmatches"><div class="h2title">Letzte Turnierergebnisse</div>${rows}</div>`;
 }
 document.getElementById('pmBody').addEventListener('click', e=>{
   const row=e.target.closest('.lastm'); if(!row) return;
