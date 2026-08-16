@@ -125,6 +125,11 @@
     border:1px solid var(--line);border-radius:5px;padding:0 4px;flex:0 0 auto;}
   .nextt{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);flex:0 0 auto;}
   .nextteams{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .liverow .nextteams{color:var(--ink);font-weight:600;}
+  .liverow .livechip{align-self:center;margin-bottom:0;}
+  .livescore{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;
+    color:var(--green);flex:0 0 auto;white-space:nowrap;}
+  .livecur{color:var(--muted);font-weight:400;}
   .tz-note{color:var(--faint);font-weight:400;}
   /* Ortszeit bei abweichender Zeitzone: klein und sichtbar unter/neben der Nutzerzeit,
      nicht nur im Tooltip (auf dem Handy nicht auffindbar). */
@@ -719,6 +724,26 @@ function nextUpHtml(e){
       <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span></div>`).join('');
   return `<div class="nextup"><div class="nextlab">Als Nächstes</div>${rows}</div>`;
 }
+// Matches, die JETZT laufen (nicht nur "Turnier im Zeitraum live") — Zwischenstand direkt
+// in der Hauptliste, ohne dass man dafuer den Drawer oeffnen muss.
+function liveNowMatches(ev){
+  const out=[];
+  if(ev.M && DATA.results[ev.M.no]) for(const m of DATA.results[ev.M.no]) if(isLive(m)) out.push({m,g:'M'});
+  if(ev.W && DATA.results[ev.W.no]) for(const m of DATA.results[ev.W.no]) if(isLive(m)) out.push({m,g:'W'});
+  return out;
+}
+function liveNowHtml(e){
+  if(e.status!=='live') return '';
+  const live=liveNowMatches(e);
+  if(!live.length) return '';
+  const rows=live.map(({m,g})=>{
+    const cur=(m.sets&&m.sets.length)?m.sets[m.sets.length-1]:null;
+    const score=`${m.sa||0}:${m.sb||0}${cur?` <span class="livecur">(${cur[0]}:${cur[1]})</span>`:''}`;
+    return `<div class="nextrow liverow"><span class="livechip"><span class="pulse"></span>Live</span><span class="nextg">${g}</span>
+      <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span><span class="livescore">${score}</span></div>`;
+  }).join('');
+  return `<div class="nextup">${rows}</div>`;
+}
 function eventRow(e, showNextUp){
   const tv=tierColor(e.tier);
   const genders=[e.M?'M':null,e.W?'W':null].filter(Boolean).join(' · ');
@@ -751,7 +776,7 @@ function eventRow(e, showNextUp){
         <div class="country">${country(e.country)}</div>
       </div>
       <div class="right">${st}${cue}</div>
-      ${showNextUp ? nextUpHtml(e) : ''}
+      ${showNextUp ? liveNowHtml(e)+nextUpHtml(e) : ''}
     </div>`;
 }
 
