@@ -134,6 +134,7 @@
   /* Ortszeit bei abweichender Zeitzone: klein und sichtbar unter/neben der Nutzerzeit,
      nicht nur im Tooltip (auf dem Handy nicht auffindbar). */
   .t-venue{display:block;font-size:9px;color:var(--faint);font-weight:400;white-space:nowrap;margin-top:1px;}
+  .pin-ico{vertical-align:-1px;margin-right:2px;flex:0 0 auto;}
   .status{font-size:11px;font-weight:600;letter-spacing:.03em;display:inline-flex;align-items:center;gap:6px;
     padding:3px 9px;border-radius:999px;white-space:nowrap;}
   .status.finished{color:var(--muted);background:var(--surface-2);border:1px solid var(--line);}
@@ -694,6 +695,11 @@ function venueOffsetMinutes(country, dateStr){
   const zone=COUNTRY_TZ[country];
   return zone ? tzOffsetMinutes(zone, dateStr) : null;
 }
+// Schwarz-weisses Pin-Icon (statt farbigem Emoji) fuer die Ortszeit-Markierung — nutzt
+// currentColor, passt sich also automatisch der Textfarbe/dem Theme an.
+const PIN_ICON = '<svg class="pin-ico" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  +'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  +'<path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 // Tag.Monat ohne Jahr — Runden im Drawer koennen sich ueber mehrere Tage erstrecken, ohne
 // Datum ist bei der Uhrzeit allein nicht erkennbar, welcher Tag gemeint ist.
 const shortDate = dateStr => {
@@ -714,10 +720,10 @@ function dualTime(date, time, offsetMin, compact){
   const userTime=new Date(localAsUtc-offsetMin*60000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
   // Bei Abweichung immer beide Zeiten sichtbar machen (nicht nur im Tooltip, der auf dem Handy
   // nicht auffindbar ist) — die erste Zeit ist immer implizit "deine", die zweite klein mit
-  // "local" beschriftet (kurz genug fuer die schmale Spalte, aber eindeutig).
+  // einer Pin-Nadel statt Textlabel markiert (kurz genug fuer die schmale Spalte, aber eindeutig).
   return compact
-    ? `<span class="t-user">${userTime}</span><span class="t-venue">local ${hhmm}</span>`
-    : `<span class="t-user">${userTime}</span> <span class="tz-note">(local ${hhmm})</span>`;
+    ? `<span class="t-user">${userTime}</span><span class="t-venue" title="Ortszeit">${PIN_ICON}${hhmm}</span>`
+    : `<span class="t-user">${userTime}</span> <span class="tz-note" title="Ortszeit">(${PIN_ICON}${hhmm})</span>`;
 }
 function nextUpMatches(ev, limit=2){
   const out=[];
