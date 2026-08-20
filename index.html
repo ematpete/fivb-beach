@@ -438,6 +438,8 @@
   .match .mt{font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;
     min-width:0;overflow:hidden;}
   .match .mt .t-venue{overflow:hidden;text-overflow:ellipsis;}
+  .match .mt-date{display:block;font-size:9.5px;color:var(--faint);white-space:nowrap;
+    font-weight:600;margin-bottom:1px;}
   .match .teams{display:flex;flex-direction:column;gap:3px;min-width:0;}
   .match .team{display:grid;grid-template-columns:1fr auto 15px;gap:10px;align-items:center;}
   .match .team.win .tn{font-weight:700;}
@@ -692,6 +694,13 @@ function venueOffsetMinutes(country, dateStr){
   const zone=COUNTRY_TZ[country];
   return zone ? tzOffsetMinutes(zone, dateStr) : null;
 }
+// Tag.Monat ohne Jahr — Runden im Drawer koennen sich ueber mehrere Tage erstrecken, ohne
+// Datum ist bei der Uhrzeit allein nicht erkennbar, welcher Tag gemeint ist.
+const shortDate = dateStr => {
+  if(!dateStr) return '';
+  const [,mo,d]=dateStr.split('-');
+  return `${d}.${mo}.`;
+};
 // Uhrzeit des Nutzers voran, Ortszeit in Klammern dahinter — nur wenn sich die Zeitzonen
 // tatsaechlich unterscheiden, sonst bloss die eine Uhrzeit (keine unnoetige Dopplung).
 function dualTime(date, time, offsetMin, compact){
@@ -1599,12 +1608,13 @@ function renderList(){
     if(isPool(rc)) out += renderPoolStandings(rm, matches);
     for(const m of rm){
       const time=dualTime(m.date,m.time,offset,true);
+      const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}`;
       if(!played(m)){
         const A=slotInfo(m,'a'), B=slotInfo(m,'b');
         // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
         const preview = m.a && m.b;
         out += `<div class="match sched${preview?' expandable':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Head-to-Head ${m.a} gegen ${m.b}"`:''}>
-          <div class="mt">${time||'—'}</div>
+          <div class="mt">${mtLabel}</div>
           <div class="teams">
             <div class="team ${A.feeder?'feeder':''}"><span class="tn">${slotText(A)}</span><span></span><span class="pt">–</span></div>
             <div class="team ${B.feeder?'feeder':''}"><span class="tn">${slotText(B)}</span><span></span><span class="pt">–</span></div>
@@ -1617,7 +1627,7 @@ function renderList(){
       const live=isLive(m), aWin=!live && +m.sa>+m.sb;
       const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
       out += `<div class="match expandable${live?' inprogress':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
-        <div class="mt">${time||'—'}</div>
+        <div class="mt">${mtLabel}</div>
         <div class="teams">
           ${liveTag}
           <div class="team ${aWin?'win':''}"><span class="tn">${m.a||'—'}</span>${setline(m,0)}<span class="pt">${m.sa}</span></div>
