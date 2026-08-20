@@ -711,7 +711,7 @@ function dualTime(date, time, offsetMin, compact){
   if(offsetMin===browserOffset) return hhmm;
   const localAsUtc=Date.parse(`${date}T${time}Z`);
   if(isNaN(localAsUtc)) return hhmm;
-  const userTime=new Date(localAsUtc-offsetMin*60000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  const userTime=new Date(localAsUtc-offsetMin*60000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
   // Bei Abweichung immer beide Zeiten sichtbar machen (nicht nur im Tooltip, der auf dem Handy
   // nicht auffindbar ist) — die erste Zeit ist immer implizit "deine", die zweite klein mit
   // "local" beschriftet (kurz genug fuer die schmale Spalte, aber eindeutig).
