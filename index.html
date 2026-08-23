@@ -317,8 +317,10 @@
   .h2hCompare .h2teams{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .h2hCompare .h2s.lead{color:var(--green);}
   /* Seed im Baum */
+  /* min-width statt automatischer Breite, sonst verschiebt ein 2-stelliger Seed (z.B. "12")
+     die nachfolgende Flagge/den Namen gegenueber einem 1-stelligen ("3") nach rechts. */
   .bx .brow .seed{font-family:var(--mono);font-size:9px;color:var(--faint);margin-right:5px;
-    vertical-align:middle;}
+    vertical-align:middle;display:inline-block;min-width:13px;text-align:right;}
   /* klickbare Spieler */
   .plink{cursor:pointer;border-bottom:1px dotted color-mix(in srgb,var(--water) 55%,transparent);
     transition:color .12s;}
