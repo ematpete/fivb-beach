@@ -368,9 +368,11 @@
   .bx .bmatchno{position:absolute;top:-8px;left:9px;font-family:var(--mono);font-size:9px;color:var(--faint);
     background:var(--surface);padding:0 4px;}
   /* Freistehend (keine Verbinderlinie noetig) — aber visuell weiterhin unter dem Finale
-     rechtsbuendig, nur minimal weiter rechts/unten als die alte (verschachtelte) Position. */
-  .bkt-bronze{margin-top:22px;padding-top:12px;padding-right:8px;border-top:1px solid var(--line);
-    display:flex;flex-direction:column;align-items:flex-end;}
+     rechtsbuendig, nur minimal weiter rechts/unten als die alte (verschachtelte) Position.
+     width:fit-content statt volle Breite, damit die Trennlinie nur so breit wie die Box
+     selbst ist, nicht quer ueber den ganzen Baum. */
+  .bkt-bronze{margin-top:8px;margin-left:auto;width:fit-content;padding-top:8px;padding-right:8px;
+    border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:flex-end;}
   .bkt-bronze .blab{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--gold);margin-bottom:6px;}
   .bkt-bronze .bx{max-width:230px;}
