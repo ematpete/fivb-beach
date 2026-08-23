@@ -363,6 +363,9 @@
   .bx .brow.feeder .bn{font-style:italic;color:#8A6FE0;}
   .bx .brow .bs{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted);}
   .bx .brow.win .bs{color:var(--green);}
+  .bx .bsets{grid-column:1/-1;margin-top:-1px;}
+  .bx .setline{font-size:9.5px;color:var(--faint);}
+  .bx .setline .sc{min-width:12px;padding:0 3px;}
   .bx .bmatchno{position:absolute;top:-8px;left:9px;font-family:var(--mono);font-size:9px;color:var(--faint);
     background:var(--surface);padding:0 4px;}
   .bkt-bronze{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
@@ -441,6 +444,8 @@
   .match .mt .t-venue{overflow:hidden;text-overflow:ellipsis;}
   .match .mt-date{display:block;font-size:9.5px;color:var(--faint);white-space:nowrap;
     font-weight:600;margin-bottom:1px;}
+  .match .mt-no{display:block;font-size:8.5px;color:var(--faint);white-space:nowrap;
+    opacity:.7;margin-top:1px;}
   .match .teams{display:flex;flex-direction:column;gap:3px;min-width:0;}
   .match .team{display:grid;grid-template-columns:1fr auto 15px;gap:10px;align-items:center;}
   .match .team.win .tn{font-weight:700;}
@@ -819,7 +824,11 @@ function render(){
   document.getElementById('empty').hidden = ev.length>0;
 
   let html='';
-  const liveNow = DATA.events.filter(e=>e.status==='live');
+  // Live-Turniere nach Stufe sortiert (Elite vor Challenge vor Futures vor Rest), nicht nach
+  // Zufalls-/Datenreihenfolge — die wichtigeren Turniere sollen oben im Pin stehen.
+  const LIVE_TIER_ORDER = {Elite:0, Challenge:1, Futures:2};
+  const liveNow = DATA.events.filter(e=>e.status==='live')
+    .sort((a,b)=>(LIVE_TIER_ORDER[tierGroup(a.tier)]??3)-(LIVE_TIER_ORDER[tierGroup(b.tier)]??3));
   if(liveNow.length){
     html += `<div class="livepin"><div class="livepin-lab"><span class="pulse"></span>Live jetzt</div>`
       + `<div class="list">${liveNow.map(e=>eventRow(e,true)).join('')}</div></div>`;
@@ -1623,7 +1632,7 @@ function renderList(){
     if(isPool(rc)) out += renderPoolStandings(rm, matches);
     for(const m of rm){
       const time=dualTime(m.date,m.time,offset,true);
-      const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}`;
+      const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}<span class="mt-no">#${m.n}</span>`;
       if(!played(m)){
         const A=slotInfo(m,'a'), B=slotInfo(m,'b');
         // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
@@ -1820,12 +1829,13 @@ function bracketBox(m){
   const done=played(m), live=isLive(m);
   const A=slotInfo(m,'a'), B=slotInfo(m,'b');
   const aWin=done && !live && +m.sa>+m.sb, bWin=done && !live && +m.sb>+m.sa;
-  const brow=(S,win,score,seed)=>`<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="Aus ${S.roundlab}: ${S.sub}"`:''}>
-    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs">${done?score:''}</span></div>`;
+  const brow=(S,win,score,setsHtml,seed)=>`<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="Aus ${S.roundlab}: ${S.sub}"`:''}>
+    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs">${done?score:''}</span>
+    ${done&&setsHtml?`<span class="bsets">${setsHtml}</span>`:''}</div>`;
   const clk = done ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="Match-Details ${m.a} gegen ${m.b}` : '';
   const tag = live ? `<span class="livechip bx-live"><span class="pulse"></span>Live</span>` : '';
   return `<div class="bx ${done?'done':''}${live?' live':''}${clk}">${tag}<span class="bmatchno">#${m.n}</span>
-    ${brow(A,aWin,m.sa,m.sda)}${brow(B,bWin,m.sb,m.sdb)}</div>`;
+    ${brow(A,aWin,m.sa,setline(m,0),m.sda)}${brow(B,bWin,m.sb,setline(m,1),m.sdb)}</div>`;
 }
 
 // Baum-Reihenfolge einmal berechnen — von renderBracket() UND renderList() genutzt,
@@ -1947,16 +1957,16 @@ function renderBracket(){
   const bronze = bm ? `<div class="bkt-bronze"><div class="blab">Spiel um Platz 3</div>${bracketBox(bm)}</div>` : '';
   chain.forEach((rc,i)=>{
     const ms=byRc[rc];
-    const isLast = i===chain.length-1;
-    const cls = isLast ? '' : 'binary';
-    cols += `<div class="rnd ${cls}"><div class="rlab">${roundLabel(rc,ms[0].rn)}</div><div class="cells">`
-      + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div>`
-      + (isLast ? bronze : '') + `</div>`;
+    cols += `<div class="rnd ${i===chain.length-1?'':'binary'}"><div class="rlab">${roundLabel(rc,ms[0].rn)}</div><div class="cells">`
+      + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div></div>`;
   });
   const note = skipped.length
     ? `<div class="bkt-note">Weitere Zubringer aus ${skipped.map(rc=>roundLabel(rc)).join(', ')} sind in den Boxen als „Sieger #Nr." vermerkt.</div>`
     : '';
-  return `<div class="bkt-scroll"><div class="bkt">${cols}</div></div>${note}`;
+  // Bronze-Box bewusst AUSSERHALB der Spalten-Flexbox (wie im Double-KO-Layout) — haengt sie
+  // innerhalb der Finalspalte, blaeht sie deren Hoehe auf und zieht dadurch die Verbinder-Linie
+  // der Halbfinal-Spalte (haelt sich an der Gesamthoehe) viel zu weit nach unten.
+  return `<div class="bkt-scroll"><div class="bkt">${cols}</div></div>${bronze}${note}`;
 }
 function closeDrawer(){
   stopLivePoll();
