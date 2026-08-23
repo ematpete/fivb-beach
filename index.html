@@ -477,6 +477,7 @@
     border-radius:4px;border:1px solid var(--line);color:var(--muted);
     display:inline-flex;align-items:center;gap:4px;}
   .fed .flag{font-size:11px;line-height:1;}
+  .team-flag{margin-right:4px;font-size:0.92em;}
   .mdetail .setgrid{display:grid;grid-template-columns:auto 1fr auto;gap:5px 14px;align-items:baseline;
     font-variant-numeric:tabular-nums;}
   .mdetail .sk{font-family:var(--mono);font-size:11px;color:var(--faint);}
@@ -742,7 +743,7 @@ function nextUpHtml(e){
   if(!next.length) return '';
   const offset=venueOffsetMinutes(e.country, e.start);
   const rows=next.map(({m,g})=>`<div class="nextrow"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
-      <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span></div>`).join('');
+      <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span></div>`).join('');
   return `<div class="nextup"><div class="nextlab">Als Nächstes</div>${rows}</div>`;
 }
 // Matches, die JETZT laufen (nicht nur "Turnier im Zeitraum live") — Zwischenstand direkt
@@ -761,7 +762,7 @@ function liveNowHtml(e){
     const cur=(m.sets&&m.sets.length)?m.sets[m.sets.length-1]:null;
     const score=`${m.sa||0}:${m.sb||0}${cur?` <span class="livecur">(${cur[0]}:${cur[1]})</span>`:''}`;
     return `<div class="nextrow liverow"><span class="livechip"><span class="pulse"></span>Live</span><span class="nextg">${g}</span>
-      <span class="nextteams">${m.a||'TBD'} – ${m.b||'TBD'}</span><span class="livescore">${score}</span></div>`;
+      <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span><span class="livescore">${score}</span></div>`;
   }).join('');
   return `<div class="nextup">${rows}</div>`;
 }
@@ -851,11 +852,11 @@ const scrim=document.getElementById('scrim'), drawer=document.getElementById('dr
 // Runden-Reihenfolge: Finale ganz oben → Gruppenphase → Qualifikation ganz unten
 // Bekannte KO-Runden mit Rang (kleiner = weiter oben). Alles andere wird aus den Daten abgeleitet,
 // damit KEINE Runde verloren geht — auch Zwischenrunden (R24/R32) oder unbekannte Codes.
-const KO_RANK={F1:0,F3:1,BM:1,GM:0,SF:2,QF:3,R16:4,R24:5,R32:6,R48:7,LL:9};
+const KO_RANK={F1:0,F3:1,BM:1,GM:0,SF:2,QF:3,R12:4,R16:5,R24:6,R32:7,R48:8,LL:9};
 const ROUND_LABEL={F1:'Finale',F3:'Spiel um Platz 3',BM:'Spiel um Platz 3',SF:'Halbfinale',
-  QF:'Viertelfinale',R16:'Achtelfinale',R24:'Zwischenrunde · Round of 24',
-  R32:'Zwischenrunde · Round of 32',R48:'Zwischenrunde · Round of 48',
-  LL:'Lucky Losers',I:'Qualifikation'};
+  QF:'Viertelfinale',R12:'Zwischenrunde · Round of 12',R16:'Achtelfinale',
+  R24:'Zwischenrunde · Round of 24',R32:'Zwischenrunde · Round of 32',
+  R48:'Zwischenrunde · Round of 48',LL:'Lucky Losers',I:'Qualifikation'};
 const POOL_COLORS=['#EC5231','#C8922A','#0E8E9C','#1FA06A','#7C5BD6','#D6355A','#2E9E6C','#5B78C0',
   '#B4791F','#0E6E9C'];
 const isPool=rc=>/^P[A-Z]$/.test(rc||'');
@@ -928,6 +929,9 @@ const fed = c => {
   const flag=flagEmoji(c);
   return `<span class="fed">${flag?`<span class="flag">${flag}</span>`:''}${c}</span>`;
 };
+// Nur die Flagge, ohne Code-Badge — fuer Teamnamen in Listen/Baum, wo der 3-Buchstaben-Code
+// zu viel Platz braucht, die Flagge allein aber trotzdem sofort Herkunft zeigt.
+const teamFlag = c => { const f=flagEmoji(c); return f ? `<span class="team-flag">${f}</span>` : ''; };
 
 const age = bd => { if(!bd) return null; const g=new Date(DATA.generated||'2026-08-13'), b=new Date(bd);
   let a=g.getFullYear()-b.getFullYear();
@@ -971,7 +975,7 @@ function buildH2H(m){
     .join('');
   const note = allSeasonsLoaded ? 'alle Saisonen' : 'lädt weitere Saisonen …';
   return `<div class="h2h"><div class="h2title">Head-to-Head <span class="h2note">(${note})</span></div>
-    <div class="h2bal"><span class="${wa>=wb?'lead':''}">${m.a} · ${wa}</span><span class="h2dash">–</span><span class="${wb>wa?'lead':''}">${wb} · ${m.b}</span></div>
+    <div class="h2bal"><span class="${wa>=wb?'lead':''}">${teamFlag(m.ca)}${m.a} · ${wa}</span><span class="h2dash">–</span><span class="${wb>wa?'lead':''}">${wb} · ${teamFlag(m.cb)}${m.b}</span></div>
     <div class="h2list">${rows}</div></div>`;
 }
 
@@ -1104,9 +1108,10 @@ function personalTournamentResults(playerNo, limit=5){
     // entscheidendes Match dieses Turniers (Finale bei Champion, sonst das Ausscheiden) fuer
     // Gegner+Ergebnis aus Sicht des gesuchten Spielers.
     const lm=row.lastMatch, lmOpp=lm?(lm.side==='a'?lm.m.b:lm.m.a):null,
+      lmOppFed=lm?(lm.side==='a'?lm.m.cb:lm.m.ca):null,
       lmScore=lm?(lm.side==='a'?`${lm.m.sa}:${lm.m.sb}`:`${lm.m.sb}:${lm.m.sa}`):null,
       lmRound=lm?lm.m.rc:null;
-    rows.push({tno,season:year,date:ev.start,city,place:row.place,cls:row.cls,result:row.result,lmRound,lmOpp,lmScore});
+    rows.push({tno,season:year,date:ev.start,city,place:row.place,cls:row.cls,result:row.result,lmRound,lmOpp,lmOppFed,lmScore});
   }
   rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return rows.slice(0,limit);
@@ -1115,11 +1120,11 @@ function renderLastMatches(playerNo){
   if(!allSeasonsLoaded) return '<p class="h2hNote">Lädt Spielverlauf …</p>';
   const res=personalTournamentResults(playerNo,5);
   if(!res.length) return '';
-  const rows=res.map(({tno,season,date,city,place,cls,result,lmRound,lmOpp,lmScore})=>{
+  const rows=res.map(({tno,season,date,city,place,cls,result,lmRound,lmOpp,lmOppFed,lmScore})=>{
     // Bei Ausscheiden ist die Kurzform (Runden-Code + Platz) griffiger als der volle Text
     // "Aus: Viertelfinale" — Champion/Bronze/aktiv behalten ihre eigene Bezeichnung.
     const roundText = cls==='out' && lmRound ? `${lmRound} · ${place}. Platz` : result;
-    const detail = lmOpp ? `Letztes Spiel: vs ${lmOpp}${lmScore?` ${lmScore}`:''} · ${city}` : city;
+    const detail = lmOpp ? `Letztes Spiel: vs ${teamFlag(lmOppFed)}${lmOpp}${lmScore?` ${lmScore}`:''} · ${city}` : city;
     return `<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
         aria-label="Ergebnis ${city} öffnen">
       <span class="lm-res ${cls}">${place?`${place}.`:'–'}</span>
@@ -1197,7 +1202,7 @@ function setline(m, side){
 // offenen KO-Platz auflösen: Team-Name, sonst „Sieger/Verlierer #X" inkl. der beiden Kandidaten
 function slotInfo(m, side){
   const name = side==='a' ? m.a : m.b;
-  if(name) return {name, feeder:false};
+  if(name) return {name, feeder:false, fed: side==='a' ? m.ca : m.cb};
   const code = side==='a' ? m.fa : m.fb;
   if(code){
     const kind = code[0]==='W' ? 'Sieger' : 'Verlierer';
@@ -1210,7 +1215,7 @@ function slotInfo(m, side){
 }
 const slotText = S => S.feeder
   ? `<span class="feedref">${S.name}</span>${S.sub?`<span class="feedteams"> ${S.sub}</span>`:''}`
-  : S.name;
+  : `${teamFlag(S.fed)}${S.name}`;
 
 let cur=null, drawerView='list';
 
@@ -1563,10 +1568,10 @@ function setView(v){
 // Gruppentabelle einer Pool-Runde: Siege/Niederlagen, Sätze, Bälle (nur gespielte Matches)
 function poolStandings(rm, allMatches){
   const teams={};
-  const get=t=>teams[t] || (teams[t]={name:t,w:0,l:0,sw:0,sl:0,pw:0,pl:0});
+  const get=(t,fedc)=>{ const e=teams[t] || (teams[t]={name:t,fed:null,w:0,l:0,sw:0,sl:0,pw:0,pl:0}); if(fedc) e.fed=fedc; return e; };
   for(const m of rm){
     if(!isFinished(m)) continue;
-    const A=get(m.a), B=get(m.b), aWin=+m.sa>+m.sb;
+    const A=get(m.a,m.ca), B=get(m.b,m.cb), aWin=+m.sa>+m.sb;
     if(aWin){A.w++; B.l++;} else {B.w++; A.l++;}
     A.sw+=+m.sa; A.sl+=+m.sb; B.sw+=+m.sb; B.sl+=+m.sa;
     for(const s of (m.sets||[])){ A.pw+=s[0]; A.pl+=s[1]; B.pw+=s[1]; B.pl+=s[0]; }
@@ -1591,7 +1596,7 @@ function renderPoolStandings(rm, allMatches){
   const dot=s=>s==='winner'?'<span class="poolstat winner" title="Gruppensieger">●</span>'
     :s==='advance'?'<span class="poolstat advance" title="Kommt weiter">●</span>'
     :s==='out'?'<span class="poolstat out" title="Ausgeschieden">●</span>':'';
-  const trs=rows.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${dot(r.status)}${r.name||'—'}</td>
+  const trs=rows.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${dot(r.status)}${teamFlag(r.fed)}${r.name||'—'}</td>
     <td class="n">${r.w}-${r.l}</td><td class="n">${r.sw}:${r.sl}</td><td class="n">${r.pw}:${r.pl}</td></tr>`).join('');
   return `<table class="standings"><thead><tr><th></th><th>Team</th><th class="n">S</th>
     <th class="n">Sätze</th><th class="n">Bälle</th></tr></thead><tbody>${trs}</tbody></table>`;
@@ -1640,8 +1645,8 @@ function renderList(){
         <div class="mt">${mtLabel}</div>
         <div class="teams">
           ${liveTag}
-          <div class="team ${aWin?'win':''}"><span class="tn">${m.a||'—'}</span>${setline(m,0)}<span class="pt">${m.sa}</span></div>
-          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${m.b||'—'}</span>${setline(m,1)}<span class="pt">${m.sb}</span></div>
+          <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}</span>${setline(m,0)}<span class="pt">${m.sa}</span></div>
+          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}</span>${setline(m,1)}<span class="pt">${m.sb}</span></div>
         </div>
         <span class="mchev">›</span>
       </div>
@@ -1816,7 +1821,7 @@ function bracketBox(m){
   const A=slotInfo(m,'a'), B=slotInfo(m,'b');
   const aWin=done && !live && +m.sa>+m.sb, bWin=done && !live && +m.sb>+m.sa;
   const brow=(S,win,score,seed)=>`<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="Aus ${S.roundlab}: ${S.sub}"`:''}>
-    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${S.name}</span><span class="bs">${done?score:''}</span></div>`;
+    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs">${done?score:''}</span></div>`;
   const clk = done ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="Match-Details ${m.a} gegen ${m.b}` : '';
   const tag = live ? `<span class="livechip bx-live"><span class="pulse"></span>Live</span>` : '';
   return `<div class="bx ${done?'done':''}${live?' live':''}${clk}">${tag}<span class="bmatchno">#${m.n}</span>
@@ -1826,7 +1831,11 @@ function bracketBox(m){
 // Baum-Reihenfolge einmal berechnen — von renderBracket() UND renderList() genutzt,
 // damit beide Ansichten dieselbe Zubringer-Logik zeigen (oben speist oben).
 function computeChainOrder(matches){
-  const STAGE={R64:0,R48:1,R32:2,R24:3,R16:4,QF:5,SF:6,F1:7};
+  // R12 (Round of 12) ist keine reine Halbierungsrunde (4 Matches -> 4 Matches im Viertelfinale,
+  // die restlichen Viertelfinal-Teams kommen per Freilos direkt) — landet daher nicht in der
+  // binaeren "chain", wird aber ueber die Feeder-Erkennung unten als eigene Zwischenrunden-
+  // Spalte erkannt, sofern der Code hier ueberhaupt bekannt ist.
+  const STAGE={R64:0,R48:1,R32:2,R24:3,R16:4,R12:5,QF:6,SF:7,F1:8};
   const present={};
   matches.forEach(m=>{ if(m.rc in STAGE){(present[m.rc]=present[m.rc]||[]).push(m);} });
   const order=Object.keys(present).sort((a,b)=>STAGE[a]-STAGE[b]);
@@ -1919,7 +1928,7 @@ function renderBracket(){
   // Trost-/Platzierungsrunden fuer Verlierer erkennen (z.B. "Loser are ranked 7th") — dafuer
   // eigenes Double-KO-Layout statt der reinen Halbierungskette.
   const repechageCodes=[...new Set(matches.map(m=>m.rc))].filter(rc=>{
-    if(['R64','R48','R32','R24','R16','QF','SF','F1','F3','BM'].includes(rc) || isQuali(rc) || isPool(rc)) return false;
+    if(['R64','R48','R32','R24','R16','R12','QF','SF','F1','F3','BM'].includes(rc) || isQuali(rc) || isPool(rc)) return false;
     const rn=(matches.find(m=>m.rc===rc)||{}).rn||'';
     return /ranked|loser/i.test(rn);
   });
@@ -1980,7 +1989,7 @@ const mscrim=document.getElementById('mscrim'), mmodal=document.getElementById('
 function openMatchModal(n){
   const m=cur.byN[+n]; if(!m) return;
   const res = played(m) ? ` · ${m.sa}:${m.sb}` : '';
-  document.getElementById('mmTitle').innerHTML = `${roundLabel(m.rc,m.rn)}${res}<b>${m.a} vs ${m.b}</b>`;
+  document.getElementById('mmTitle').innerHTML = `${roundLabel(m.rc,m.rn)}${res}<b>${teamFlag(m.ca)}${m.a} vs ${teamFlag(m.cb)}${m.b}</b>`;
   document.getElementById('mmBody').innerHTML = `<div class="mdetail">${buildMatchDetail(m)}</div>`;
   mscrim.classList.add('open'); mmodal.classList.add('open'); mmodal.setAttribute('aria-hidden','false');
   document.getElementById('mmClose').focus();
@@ -2092,14 +2101,15 @@ function renderH2HCompareResult(){
       const aWon=(+m.sa>+m.sb)===(aSide==='a');
       if(aWon) wa++; else wb++;
       const teamA=aSide==='a'?m.a:m.b, teamB=aSide==='a'?m.b:m.a;
+      const fedA=aSide==='a'?m.ca:m.cb, fedB=aSide==='a'?m.cb:m.ca;
       const scoreA=aSide==='a'?`${m.sa}:${m.sb}`:`${m.sb}:${m.sa}`;
       return `<div class="h2r"><span class="h2d">${m.date||''}</span>
         <span class="h2c">${city} · ${roundLabel(m.rc,m.rn)}</span>
-        <span class="h2teams">${teamA} – ${teamB}</span>
+        <span class="h2teams">${teamFlag(fedA)}${teamA} – ${teamFlag(fedB)}${teamB}</span>
         <span class="h2s${aWon?' lead':''}">${scoreA}</span></div>`;
     }).join('');
-  box.innerHTML=`<div class="h2hCompare"><div class="h2bal"><span class="${wa>=wb?'lead':''}">${playerLabel(h2hPickA)} · ${wa}</span>
-      <span class="h2dash">–</span><span class="${wb>wa?'lead':''}">${wb} · ${playerLabel(h2hPickB)}</span></div>
+  box.innerHTML=`<div class="h2hCompare"><div class="h2bal"><span class="${wa>=wb?'lead':''}">${teamFlag(h2hPickA.fed)}${playerLabel(h2hPickA)} · ${wa}</span>
+      <span class="h2dash">–</span><span class="${wb>wa?'lead':''}">${wb} · ${teamFlag(h2hPickB.fed)}${playerLabel(h2hPickB)}</span></div>
     <div class="h2list">${rows}</div></div>`;
 }
 function h2hPickedHtml(p,onClearId){
