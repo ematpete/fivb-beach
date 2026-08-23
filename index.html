@@ -373,7 +373,7 @@
      rechtsbuendig, nur minimal weiter rechts/unten als die alte (verschachtelte) Position.
      width:fit-content statt volle Breite, damit die Trennlinie nur so breit wie die Box
      selbst ist, nicht quer ueber den ganzen Baum. */
-  .bkt-bronze{margin-top:8px;margin-left:auto;width:fit-content;padding-top:8px;padding-right:8px;
+  .bkt-bronze{margin-top:2px;margin-left:auto;width:fit-content;padding-top:6px;padding-right:8px;
     border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:flex-end;}
   .bkt-bronze .blab{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--gold);margin-bottom:6px;}
@@ -836,7 +836,11 @@ function render(){
   // Live-Turniere nach Stufe sortiert (Elite vor Challenge vor Futures vor Rest), nicht nach
   // Zufalls-/Datenreihenfolge — die wichtigeren Turniere sollen oben im Pin stehen.
   const LIVE_TIER_ORDER = {Elite:0, Challenge:1, Futures:2};
-  const liveNow = DATA.events.filter(e=>e.status==='live')
+  // e.status kann kurz veraltet sein (die in index.html eingebetteten Startdaten werden nicht
+  // bei jedem Cron-Lauf aktualisiert) — ein laengst beendetes Turnier soll trotzdem nie als
+  // "live" aufblitzen, bevor der Hintergrund-Refresh die echten Daten nachlaedt.
+  const todayStr = new Date().toISOString().slice(0,10);
+  const liveNow = DATA.events.filter(e=>e.status==='live' && e.end>=todayStr)
     .sort((a,b)=>(LIVE_TIER_ORDER[tierGroup(a.tier)]??3)-(LIVE_TIER_ORDER[tierGroup(b.tier)]??3));
   if(liveNow.length){
     html += `<div class="livepin"><div class="livepin-lab"><span class="pulse"></span>Live jetzt</div>`
