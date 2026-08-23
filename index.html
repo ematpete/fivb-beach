@@ -356,19 +356,21 @@
   .lm-opp{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
   .lm-city{grid-column:2/-1;font-size:11px;color:var(--faint);margin-top:-3px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .bx .brow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:2px 0;font-size:12.5px;}
+  .bx .brow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:2px 0;font-size:12.5px;}
   .bx .brow+.brow{border-top:1px dashed var(--line);}
   .bx .brow.win .bn{font-weight:700;color:var(--ink);}
   .bx .brow .bn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);}
   .bx .brow.feeder .bn{font-style:italic;color:#8A6FE0;}
   .bx .brow .bs{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted);}
   .bx .brow.win .bs{color:var(--green);}
-  .bx .bsets{grid-column:1/-1;margin-top:-1px;}
   .bx .setline{font-size:9.5px;color:var(--faint);}
   .bx .setline .sc{min-width:12px;padding:0 3px;}
   .bx .bmatchno{position:absolute;top:-8px;left:9px;font-family:var(--mono);font-size:9px;color:var(--faint);
     background:var(--surface);padding:0 4px;}
-  .bkt-bronze{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+  /* Freistehend (keine Verbinderlinie noetig) — aber visuell weiterhin unter dem Finale
+     rechtsbuendig, nur minimal weiter rechts/unten als die alte (verschachtelte) Position. */
+  .bkt-bronze{margin-top:22px;padding-top:12px;padding-right:8px;border-top:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:flex-end;}
   .bkt-bronze .blab{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--gold);margin-bottom:6px;}
   .bkt-bronze .bx{max-width:230px;}
@@ -436,7 +438,7 @@
   .elim-collapsed summary::-webkit-details-marker{display:none;}
   .elim-collapsed summary::before{content:'▸ ';color:var(--faint);}
   .elim-collapsed[open] summary::before{content:'▾ ';}
-  .match{display:grid;grid-template-columns:60px 1fr;gap:8px;align-items:center;
+  .match{position:relative;display:grid;grid-template-columns:60px 1fr;gap:8px;align-items:center;
     padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
   .match:last-child{border-bottom:none;}
   .match .mt{font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;
@@ -444,8 +446,10 @@
   .match .mt .t-venue{overflow:hidden;text-overflow:ellipsis;}
   .match .mt-date{display:block;font-size:9.5px;color:var(--faint);white-space:nowrap;
     font-weight:600;margin-bottom:1px;}
-  .match .mt-no{display:block;font-size:8.5px;color:var(--faint);white-space:nowrap;
-    opacity:.7;margin-top:1px;}
+  /* Match-Nummer nicht in der ohnehin engen Zeitspalte, sondern als kleines, zurueckhaltendes
+     Eck-Label oben rechts an der Zeile — Chevron sitzt vertikal mittig, kollidiert nicht. */
+  .match .match-no{position:absolute;top:2px;right:6px;font-family:var(--mono);font-size:8px;
+    color:var(--faint);opacity:.55;white-space:nowrap;}
   .match .teams{display:flex;flex-direction:column;gap:3px;min-width:0;}
   .match .team{display:grid;grid-template-columns:1fr auto 15px;gap:10px;align-items:center;}
   .match .team.win .tn{font-weight:700;}
@@ -512,9 +516,6 @@
     <div class="brand">
       <span class="eyebrow">FIVB &amp; CEV Beach Volleyball</span>
       <h1>Beach Volleyball <span class="yr" id="yr">2026</span></h1>
-      <p class="sub">Kalender &amp; Ergebnisse von FIVB Beach Pro Tour, CEV sowie ÖVV-/DVV-Nationaltour,
-        live gezogen aus dem <code>FIVB VIS</code> Web Service.
-        Klick auf eine Turnierzeile öffnet die Ergebnisse.</p>
     </div>
     <div class="hdr-actions">
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
@@ -736,9 +737,13 @@ function dualTime(date, time, offsetMin, compact){
     : `<span class="t-user">${userTime}</span> <span class="tz-note" title="Ortszeit">(${PIN_ICON}${hhmm})</span>`;
 }
 function nextUpMatches(ev, limit=2){
+  // Manche Turniere behalten von einem Freilos (Bye) eine "tote" Platzhalter-Partie ohne
+  // Uhrzeit/Gegner, die FIVB nie aufraeumt (Status bleibt dauerhaft "nicht gestartet"). Ohne
+  // Uhrzeit sortiert so ein Match als String vor jedem echten und verdraengt die tatsaechlich
+  // anstehenden Spiele aus der Liste — daher hier ausschliessen.
   const out=[];
-  if(ev.M && DATA.results[ev.M.no]) for(const m of DATA.results[ev.M.no]) if(!played(m)) out.push({m,g:'M'});
-  if(ev.W && DATA.results[ev.W.no]) for(const m of DATA.results[ev.W.no]) if(!played(m)) out.push({m,g:'W'});
+  if(ev.M && DATA.results[ev.M.no]) for(const m of DATA.results[ev.M.no]) if(!played(m) && m.time) out.push({m,g:'M'});
+  if(ev.W && DATA.results[ev.W.no]) for(const m of DATA.results[ev.W.no]) if(!played(m) && m.time) out.push({m,g:'W'});
   out.sort((a,b)=>(a.m.date+a.m.time).localeCompare(b.m.date+b.m.time));
   return out.slice(0,limit);
 }
@@ -1632,12 +1637,13 @@ function renderList(){
     if(isPool(rc)) out += renderPoolStandings(rm, matches);
     for(const m of rm){
       const time=dualTime(m.date,m.time,offset,true);
-      const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}<span class="mt-no">#${m.n}</span>`;
+      const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}`;
       if(!played(m)){
         const A=slotInfo(m,'a'), B=slotInfo(m,'b');
         // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
         const preview = m.a && m.b;
         out += `<div class="match sched${preview?' expandable':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Head-to-Head ${m.a} gegen ${m.b}"`:''}>
+          <span class="match-no">#${m.n}</span>
           <div class="mt">${mtLabel}</div>
           <div class="teams">
             <div class="team ${A.feeder?'feeder':''}"><span class="tn">${slotText(A)}</span><span></span><span class="pt">–</span></div>
@@ -1651,6 +1657,7 @@ function renderList(){
       const live=isLive(m), aWin=!live && +m.sa>+m.sb;
       const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
       out += `<div class="match expandable${live?' inprogress':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
+        <span class="match-no">#${m.n}</span>
         <div class="mt">${mtLabel}</div>
         <div class="teams">
           ${liveTag}
@@ -1830,8 +1837,7 @@ function bracketBox(m){
   const A=slotInfo(m,'a'), B=slotInfo(m,'b');
   const aWin=done && !live && +m.sa>+m.sb, bWin=done && !live && +m.sb>+m.sa;
   const brow=(S,win,score,setsHtml,seed)=>`<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="Aus ${S.roundlab}: ${S.sub}"`:''}>
-    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs">${done?score:''}</span>
-    ${done&&setsHtml?`<span class="bsets">${setsHtml}</span>`:''}</div>`;
+    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs">${done?score:''}</span>${done&&setsHtml?setsHtml:''}</div>`;
   const clk = done ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="Match-Details ${m.a} gegen ${m.b}` : '';
   const tag = live ? `<span class="livechip bx-live"><span class="pulse"></span>Live</span>` : '';
   return `<div class="bx ${done?'done':''}${live?' live':''}${clk}">${tag}<span class="bmatchno">#${m.n}</span>
