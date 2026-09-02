@@ -802,7 +802,7 @@ function eventRow(e, showNextUp){
   return `
     <div class="row ${rNo?'clickable':''}" style="--tier:${tv}"
       ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="${resNo?'Ergebnisse':'Setzliste'} ${e.city} öffnen"`:''}>
-      <div class="date">${fmtRange(e.start,e.end)}<b>${e.start.slice(8)}. ${MONTHS[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
+      <div class="date">${fmtRange(e.start,e.end)}<b>${MONTHS[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
       <div class="main">
         <div class="city">${e.city}
           <span class="badges"><span class="org ${e.org}">${orgLabel(e.org)}</span>
