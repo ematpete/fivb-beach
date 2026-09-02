@@ -194,7 +194,7 @@
   .scrim{position:fixed;inset:0;background:rgba(8,14,17,.55);backdrop-filter:blur(2px);
     opacity:0;pointer-events:none;transition:opacity .2s;z-index:40;}
   .scrim.open{opacity:1;pointer-events:auto;}
-  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(920px,100%);background:var(--surface);
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:max(50vw,min(920px,100%));background:var(--surface);
     border-left:1px solid var(--line);box-shadow:-20px 0 60px rgba(0,0,0,.28);
     transform:translateX(100%);transition:transform .26s cubic-bezier(.4,.14,.2,1);z-index:50;
     display:flex;flex-direction:column;}
@@ -235,8 +235,8 @@
   .bkt-scroll{overflow-x:auto;padding:6px 2px 12px;}
   .bkt{display:flex;min-width:max-content;--brk:var(--line);}
   .rnd{display:flex;flex-direction:column;flex:1 0 200px;min-width:200px;}
-  .rnd .rlab{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-    color:var(--faint);text-align:center;padding:2px 0 6px;}
+  .rnd .rlab{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--faint);text-align:center;padding:2px 0 6px;}
   .cells{display:flex;flex-direction:column;justify-content:space-around;flex:1;}
   .cell{flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;}
   .rnd:not(:last-child) .cell::after{content:"";position:absolute;left:100%;top:50%;width:14px;height:2px;
@@ -255,8 +255,8 @@
   .bkt.dko .rnd:not(:first-child) .cell .bx::before,
   .bkt.dko .rnd.binary .cell:nth-child(odd)::before{content:none;}
   .bkt.dko .dko-center{flex:1 0 210px;min-width:210px;}
-  .bkt.dko .dko-sublab{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--faint);text-align:center;margin-bottom:3px;}
+  .bkt.dko .dko-sublab{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);text-align:center;margin-bottom:3px;}
   .bkt.dko .dko-final-lab{color:var(--gold);font-weight:700;}
   .bkt.dko .dko-final-cell .bx{border-color:color-mix(in srgb,var(--gold) 45%,var(--line));}
   .bx.empty{border:1px dashed var(--line);background:transparent;box-shadow:none;min-height:34px;opacity:.5;}
@@ -458,6 +458,7 @@
   .match .team{display:grid;grid-template-columns:1fr auto 15px;gap:10px;align-items:center;}
   .match .team.win .tn{font-weight:700;}
   .match .tn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);}
+  .seedtag{font-weight:400;font-size:0.85em;color:var(--faint);}
   .match .team:not(.win) .tn{color:var(--muted);}
   .match .setline{font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums;
     color:var(--faint);display:inline-flex;}
@@ -954,6 +955,8 @@ const fed = c => {
 // Nur die Flagge, ohne Code-Badge — fuer Teamnamen in Listen/Baum, wo der 3-Buchstaben-Code
 // zu viel Platz braucht, die Flagge allein aber trotzdem sofort Herkunft zeigt.
 const teamFlag = c => { const f=flagEmoji(c); return f ? `<span class="team-flag">${f}</span>` : ''; };
+// Setzung in Klammern hinter dem Namen, dezent (duenner/kleiner als der Name selbst).
+const seedTag = n => n ? ` <span class="seedtag">(${n})</span>` : '';
 
 const age = bd => { if(!bd) return null; const g=new Date(DATA.generated||'2026-08-13'), b=new Date(bd);
   let a=g.getFullYear()-b.getFullYear();
@@ -1224,7 +1227,7 @@ function setline(m, side){
 // offenen KO-Platz auflösen: Team-Name, sonst „Sieger/Verlierer #X" inkl. der beiden Kandidaten
 function slotInfo(m, side){
   const name = side==='a' ? m.a : m.b;
-  if(name) return {name, feeder:false, fed: side==='a' ? m.ca : m.cb};
+  if(name) return {name, feeder:false, fed: side==='a' ? m.ca : m.cb, seed: side==='a' ? m.sda : m.sdb};
   const code = side==='a' ? m.fa : m.fb;
   if(code){
     const kind = code[0]==='W' ? 'Sieger' : 'Verlierer';
@@ -1237,7 +1240,7 @@ function slotInfo(m, side){
 }
 const slotText = S => S.feeder
   ? `<span class="feedref">${S.name}</span>${S.sub?`<span class="feedteams"> ${S.sub}</span>`:''}`
-  : `${teamFlag(S.fed)}${S.name}`;
+  : `${teamFlag(S.fed)}${S.name}${seedTag(S.seed)}`;
 
 let cur=null, drawerView='list';
 
@@ -1669,8 +1672,8 @@ function renderList(){
         <div class="mt">${mtLabel}</div>
         <div class="teams">
           ${liveTag}
-          <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}</span>${setline(m,0)}<span class="pt">${m.sa}</span></div>
-          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}</span>${setline(m,1)}<span class="pt">${m.sb}</span></div>
+          <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}</span>${setline(m,0)}<span class="pt">${m.sa}</span></div>
+          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}</span>${setline(m,1)}<span class="pt">${m.sb}</span></div>
         </div>
         <span class="mchev">›</span>
       </div>
