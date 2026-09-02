@@ -355,7 +355,8 @@
     padding:5px 4px;border-radius:6px;font-size:12px;cursor:pointer;}
   .lastm:hover{background:var(--surface-2);}
   .lm-res{font-family:var(--mono);font-weight:700;font-size:10.5px;text-align:center;
-    border-radius:5px;padding:2px 0;color:#fff;white-space:nowrap;align-self:center;}
+    border-radius:5px;padding:2px 0;color:#fff;white-space:nowrap;align-self:center;
+    width:100%;box-sizing:border-box;justify-self:stretch;}
   .lm-res.champ{background:var(--gold);}
   .lm-res.bronze{background:var(--water);}
   .lm-res.active{background:var(--green);}
@@ -1180,7 +1181,7 @@ function personalTournamentResults(playerNo, limit=5){
       lmOppFed=lm?(lm.side==='a'?lm.m.cb:lm.m.ca):null,
       lmScore=lm?(lm.side==='a'?`${lm.m.sa}:${lm.m.sb}`:`${lm.m.sb}:${lm.m.sa}`):null,
       lmRound=lm?lm.m.rc:null;
-    rows.push({tno,season:year,date:ev.start,city,place:row.place,cls:row.cls,result:row.result,lmRound,lmOpp,lmOppFed,lmScore});
+    rows.push({tno,season:year,date:ev.start,city,tier:ev.tier,place:row.place,cls:row.cls,result:row.result,lmRound,lmOpp,lmOppFed,lmScore});
   }
   rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return rows.slice(0,limit);
@@ -1189,11 +1190,12 @@ function renderLastMatches(playerNo){
   if(!allSeasonsLoaded) return '<p class="h2hNote">Lädt Spielverlauf …</p>';
   const res=personalTournamentResults(playerNo,5);
   if(!res.length) return '';
-  const rows=res.map(({tno,season,date,city,place,cls,result,lmRound,lmOpp,lmOppFed,lmScore})=>{
+  const rows=res.map(({tno,season,date,city,tier,place,cls,result,lmRound,lmOpp,lmOppFed,lmScore})=>{
     // Bei Ausscheiden ist die Kurzform (Runden-Code + Platz) griffiger als der volle Text
     // "Aus: Viertelfinale" — Champion/Bronze/aktiv behalten ihre eigene Bezeichnung.
     const roundText = cls==='out' && lmRound ? `${lmRound} · ${place}. Platz` : result;
-    const detail = lmOpp ? `Letztes Spiel: vs ${teamFlag(lmOppFed)}${lmOpp}${lmScore?` ${lmScore}`:''} · ${city}` : city;
+    const place2=`${tier?tier+' · ':''}${city}`;
+    const detail = lmOpp ? `Letztes Spiel: vs ${teamFlag(lmOppFed)}${lmOpp}${lmScore?` ${lmScore}`:''} · ${place2}` : place2;
     return `<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
         aria-label="Ergebnis ${city} öffnen">
       <span class="lm-res ${cls}">${place?`${place}.`:'–'}</span>
