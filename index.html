@@ -521,8 +521,30 @@
     color:var(--faint);margin-bottom:6px;}
   .mdphotos-src{text-transform:none;letter-spacing:0;opacity:.7;}
   .mdphotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;}
-  .mdphotos-grid a{display:block;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--surface-2);}
-  .mdphotos-grid img{width:100%;height:100%;object-fit:cover;display:block;}
+  .mdphoto{display:block;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--surface-2);
+    border:none;padding:0;cursor:pointer;}
+  .mdphoto img{width:100%;height:100%;object-fit:cover;display:block;}
+  /* Foto-Lightbox: ueber allem anderen (auch dem Match-Detail-Modal, aus dem heraus sie
+     geoeffnet werden kann) */
+  .photolb-scrim{z-index:96;background:rgba(4,8,10,.88);}
+  .photolb{position:fixed;inset:0;z-index:97;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;opacity:0;pointer-events:none;transition:opacity .18s;padding:min(6vh,60px) min(8vw,60px);}
+  .photolb.open{opacity:1;pointer-events:auto;}
+  .photolb-img{max-width:100%;max-height:calc(100% - 40px);object-fit:contain;border-radius:6px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .photolb-close{position:fixed;top:16px;right:16px;width:36px;height:36px;border-radius:8px;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;
+    font-size:15px;line-height:1;cursor:pointer;}
+  .photolb-close:hover{background:rgba(255,255,255,.22);}
+  .photolb-nav{position:fixed;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:24px;
+    line-height:1;cursor:pointer;}
+  .photolb-nav:hover{background:rgba(255,255,255,.22);}
+  .photolb-nav[hidden]{display:none;}
+  .photolb-prev{left:min(3vw,20px);}
+  .photolb-next{right:min(3vw,20px);}
+  .photolb-cap{color:#fff;font-size:13px;text-align:center;margin-top:12px;max-width:70ch;opacity:.85;}
+  .photolb-count{color:rgba(255,255,255,.6);font-family:var(--mono);font-size:11px;margin-top:4px;}
 
   footer.foot{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);
     font-size:12px;color:var(--faint);line-height:1.6;}
@@ -618,6 +640,16 @@
   <button class="mclose" id="mmClose" type="button" aria-label="Schließen">✕</button>
   <div class="mmhead" id="mmTitle"></div>
   <div id="mmBody"></div>
+</div>
+
+<div class="mscrim photolb-scrim" id="photoLbScrim"></div>
+<div class="photolb" id="photoLb" role="dialog" aria-modal="true" aria-label="Foto" aria-hidden="true">
+  <button class="mclose photolb-close" id="photoLbClose" type="button" aria-label="Schließen">✕</button>
+  <button class="photolb-nav photolb-prev" id="photoLbPrev" type="button" aria-label="Vorheriges Foto">‹</button>
+  <img class="photolb-img" id="photoLbImg" src="" alt="">
+  <button class="photolb-nav photolb-next" id="photoLbNext" type="button" aria-label="Nächstes Foto">›</button>
+  <div class="photolb-cap" id="photoLbCap"></div>
+  <div class="photolb-count" id="photoLbCount"></div>
 </div>
 
 <div class="mscrim" id="pscrim"></div>
@@ -1636,17 +1668,55 @@ async function loadMatchPhotos(m, containerEl){
     const doc=new DOMParser().parseFromString(html,'text/html');
     const cards=[...doc.querySelectorAll('a.fm-card-wrap.-photo')].slice(0,6);
     if(!cards.length || !containerEl.isConnected) return;
-    const items=cards.map(a=>{
-      // Cloudinary generiert eigene Groessenvarianten nicht automatisch (getestet: 404) —
-      // daher das Originalbild direkt einbetten, nicht selbst eine Thumbnail-Transformation bauen.
-      const full=a.getAttribute('href')||'';
-      const cap=(a.getAttribute('data-caption')||'').replace(/"/g,'&quot;');
-      return `<a href="${full}" target="_blank" rel="noopener" title="${cap}"><img loading="lazy" src="${full}" alt=""></a>`;
-    }).join('');
+    // Cloudinary generiert eigene Groessenvarianten nicht automatisch (getestet: 404) — daher
+    // das Originalbild direkt einbetten, nicht selbst eine Thumbnail-Transformation bauen.
+    const photos=cards.map(a=>({
+      full:a.getAttribute('href')||'',
+      cap:a.getAttribute('data-caption')||'',
+    }));
+    const items=photos.map((p,i)=>
+      `<button class="mdphoto" type="button" data-idx="${i}" aria-label="${p.cap.replace(/"/g,'&quot;')}">
+        <img loading="lazy" src="${p.full}" alt=""></button>`).join('');
     containerEl.innerHTML=`<div class="mdphotos-lab">Fotos <span class="mdphotos-src">· volleyballworld.com</span></div>
       <div class="mdphotos-grid">${items}</div>`;
+    containerEl._photos=photos;
   }catch(e){ /* Slug passt vermutlich nicht — Sektion bleibt leer, kein Fehler sichtbar */ }
 }
+// Foto-Lightbox: aus jeder .mdphotos-Sektion heraus durch alle ihre Fotos blaettern.
+let photoLbPhotos=[], photoLbIdx=0;
+const photoLbScrim=document.getElementById('photoLbScrim'), photoLb=document.getElementById('photoLb');
+function renderPhotoLb(){
+  const p=photoLbPhotos[photoLbIdx]; if(!p) return;
+  document.getElementById('photoLbImg').src=p.full;
+  document.getElementById('photoLbCap').textContent=p.cap||'';
+  document.getElementById('photoLbCount').textContent=`${photoLbIdx+1} / ${photoLbPhotos.length}`;
+  const multi=photoLbPhotos.length>1;
+  document.getElementById('photoLbPrev').hidden=!multi;
+  document.getElementById('photoLbNext').hidden=!multi;
+}
+function openPhotoLb(photos, idx){
+  photoLbPhotos=photos; photoLbIdx=idx;
+  renderPhotoLb();
+  photoLbScrim.classList.add('open'); photoLb.classList.add('open'); photoLb.setAttribute('aria-hidden','false');
+  document.getElementById('photoLbClose').focus();
+}
+function closePhotoLb(){
+  photoLbScrim.classList.remove('open'); photoLb.classList.remove('open'); photoLb.setAttribute('aria-hidden','true');
+}
+function stepPhotoLb(d){
+  if(!photoLbPhotos.length) return;
+  photoLbIdx=(photoLbIdx+d+photoLbPhotos.length)%photoLbPhotos.length;
+  renderPhotoLb();
+}
+photoLbScrim.addEventListener('click',closePhotoLb);
+document.getElementById('photoLbClose').addEventListener('click',closePhotoLb);
+document.getElementById('photoLbPrev').addEventListener('click',()=>stepPhotoLb(-1));
+document.getElementById('photoLbNext').addEventListener('click',()=>stepPhotoLb(1));
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('.mdphoto'); if(!btn) return;
+  const container=btn.closest('.mdphotos'); if(!container || !container._photos) return;
+  openPhotoLb(container._photos, +btn.dataset.idx);
+});
 // Alle 15s neu laden, aber nur solange der Drawer offen bleibt UND tatsaechlich ein
 // Match gerade laeuft (nicht bloss "Turnier im Zeitraum live") — spart Anfragen, wenn
 // gerade Pause ist.
@@ -2147,6 +2217,12 @@ function closeDrawer(){
 scrim.addEventListener('click',closeDrawer);
 document.getElementById('dclose').addEventListener('click',closeDrawer);
 document.addEventListener('keydown',e=>{
+  if(photoLb.classList.contains('open')){
+    if(e.key==='Escape') closePhotoLb();
+    else if(e.key==='ArrowLeft') stepPhotoLb(-1);
+    else if(e.key==='ArrowRight') stepPhotoLb(1);
+    return;
+  }
   if(e.key!=='Escape') return;
   if(pmodal.classList.contains('open')) closePlayerCard();
   else if(mmodal.classList.contains('open')) closeMatchModal();
