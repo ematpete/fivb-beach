@@ -508,6 +508,14 @@
   .mdmeta .k{color:var(--faint);flex:0 0 82px;}
   .mdmeta .v{color:var(--ink);}
   .mdetail .mdmeta{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+  .mdphotos:empty{display:none;}
+  .mdphotos{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+  .mdphotos-lab{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:6px;}
+  .mdphotos-src{text-transform:none;letter-spacing:0;opacity:.7;}
+  .mdphotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;}
+  .mdphotos-grid a{display:block;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--surface-2);}
+  .mdphotos-grid img{width:100%;height:100%;object-fit:cover;display:block;}
 
   footer.foot{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);
     font-size:12px;color:var(--faint);line-height:1.6;}
@@ -955,6 +963,29 @@ const fed = c => {
 // Nur die Flagge, ohne Code-Badge — fuer Teamnamen in Listen/Baum, wo der 3-Buchstaben-Code
 // zu viel Platz braucht, die Flagge allein aber trotzdem sofort Herkunft zeigt.
 const teamFlag = c => { const f=flagEmoji(c); return f ? `<span class="team-flag">${f}</span>` : ''; };
+// Fuer die (geratene) volleyballworld.com-Foto-URL: Turnier-Land -> IOC-3-Buchstaben-Code,
+// dieselben Laendernamen wie COUNTRY_TZ. Kein VIS-Feld dafuer verfuegbar, daher hart codiert
+// und nur fuer die Laender abgedeckt, wo aktuell Beach-Pro-Tour-Stopps stattfinden.
+const COUNTRY_FED = {
+  'Antigua and Barbuda':'ATG','Argentina':'ARG','Australia':'AUS','Austria':'AUT','Azerbaijan':'AZE',
+  'Belgium':'BEL','Brazil':'BRA','Bulgaria':'BUL','Burundi':'BDI','Cambodia':'CAM','Canada':'CAN',
+  'Cape Verde':'CPV','Cayman Islands':'CAY','China':'CHN','Cook Islands':'COK','Costa Rica':'CRC',
+  'Croatia':'CRO','Cuba':'CUB','Cyprus':'CYP','Czech Republic':'CZE','Dominican Republic':'DOM',
+  'Egypt':'EGY','Estonia':'EST','France':'FRA','French Polynesia':'PYF','Germany':'GER',
+  'Great Britain':'GBR','Greece':'GRE','Guatemala':'GUA','Hungary':'HUN','India':'IND','Indonesia':'INA',
+  'Iran':'IRI','Italy':'ITA','Jamaica':'JAM','Japan':'JPN','Korea':'KOR','Latvia':'LAT','Malaysia':'MAS',
+  'Maldives':'MDV','Mexico':'MEX','Morocco':'MAR','Netherlands':'NED','New Zealand':'NZL','Norway':'NOR',
+  'Philippines':'PHI','Poland':'POL','Portugal':'POR','Puerto Rico':'PUR','Qatar':'QAT','Romania':'ROU',
+  'Russia':'RUS','Rwanda':'RWA','Saint Lucia':'LCA','Saudi Arabia':'KSA','Serbia':'SRB','Singapore':'SIN',
+  'Slovenia':'SLO','South Africa':'RSA','Spain':'ESP','Sri Lanka':'SRI','Sweden':'SWE','Switzerland':'SUI',
+  'Thailand':'THA','Türkiye':'TUR','Uganda':'UGA','United Arab Emirates':'UAE','United States':'USA',
+  'Viet Nam':'VIE',
+};
+// Nur fuer FIVB Beach Pro Tour (Elite16/Elite/Challenge/Futures) — volleyballworld.com fasst
+// "Elite" und "Elite16" unter demselben URL-Segment "elite16" zusammen (empirisch an Gstaad 2026
+// verifiziert: bei uns Stufe "Elite", URL-Pfad trotzdem ".../elite16/..."), CEV/Nationaltouren
+// haben dort keine eigene Seite in diesem Schema.
+const VW_TIER_SLUG = {Elite16:'elite16', Elite:'elite16', Challenge:'challenge', Futures:'futures'};
 // Setzung in Klammern hinter dem Namen, dezent (duenner/kleiner als der Name selbst).
 const seedTag = n => n ? ` <span class="seedtag">(${n})</span>` : '';
 
@@ -976,10 +1007,12 @@ function teamPlayers(m, side){
 function encounters(teamA,teamB){
   const K=[teamA,teamB].sort().join('||'), out=[];
   for(const sd of Object.values(seasonCache)){
-    for(const [tno,ms] of Object.entries(sd.results||{}))
+    for(const [tno,ms] of Object.entries(sd.results||{})){
+      const ev=eventForTournament(sd,tno);
       for(const mm of ms)
         if(isFinished(mm) && [mm.a,mm.b].sort().join('||')===K)
-          out.push({mm, city:((sd.venues||{})[tno]||{}).city||''});
+          out.push({mm, city:((sd.venues||{})[tno]||{}).city||'', tier: ev?ev.tier:''});
+    }
   }
   return out;
 }
@@ -991,11 +1024,11 @@ function buildH2H(m){
   // Satzstand immer aus Sicht von m.a:m.b zeigen — in der Historie stehen Teams je
   // nach Match mal als a, mal als b, sonst passt die Zeile nicht zur Gesamtbilanz oben.
   const rows=enc.sort((x,y)=>(y.mm.date||'').localeCompare(x.mm.date||''))
-    .map(({mm,city})=>{
+    .map(({mm,city,tier})=>{
       const flipped=mm.a!==m.a;
       const sa=flipped?mm.sb:mm.sa, sb=flipped?mm.sa:mm.sb;
       return `<div class="h2r${mm===m?' cur':''}"><span class="h2d">${mm.date||''}</span>
-        <span class="h2c">${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${sa}:${sb}</span></div>`;
+        <span class="h2c">${tier?tier+' · ':''}${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${sa}:${sb}</span></div>`;
     })
     .join('');
   const note = allSeasonsLoaded ? 'alle Saisonen' : 'lädt weitere Saisonen …';
@@ -1211,6 +1244,7 @@ function buildMatchDetail(m){
   </div>
     <div class="setgrid">${setg}${totRow}</div>
     <div class="mdmeta">${meta}</div>
+    <div class="mdphotos" data-mno="${m.n}"></div>
     ${buildH2H(m)}`;
 }
 // Satzergebnisse für ein Team rendern (side 0=A, 1=B); Gewinnsätze hervorheben
@@ -1551,6 +1585,41 @@ async function enrichWithVWFallback(matches){
   const vwResults=await Promise.all(candidates.map(m=>fetchVWLiveScore(m.gn)));
   const byN=new Map(); candidates.forEach((m,i)=>byN.set(m.n,vwResults[i]));
   return matches.map(m=>byN.has(m.n) ? applyVWFallback(m,byN.get(m.n)) : m);
+}
+// Match-Fotos von volleyballworld.com — geratene Seiten-URL (kein VIS-Feld dafuer verfuegbar),
+// daher rein bestmoegliche Vermutung mit stillem Abbruch, wenn der Slug nicht passt (kein
+// kaputtes UI, die Fotosektion bleibt dann einfach leer).
+const slugify = s => foldText(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+function vwMatchUrl(ev, gn){
+  if(!ev || ev.org!=='FIVB' || !gn) return null;
+  const tierSlug=VW_TIER_SLUG[ev.tier];
+  const fedCode=COUNTRY_FED[ev.country];
+  if(!tierSlug || !fedCode) return null;
+  const year=ev.start.slice(0,4);
+  const citySlug=`${slugify(ev.city)}-${fedCode.toLowerCase()}`;
+  return `https://en.volleyballworld.com/beachvolleyball/competitions/beach-pro-tour/${year}/${tierSlug}/${citySlug}/schedule/${gn}/_libraries/_latest-photos`;
+}
+async function loadMatchPhotos(m, containerEl){
+  if(!cur || !cur.ev || !played(m) || !m.gn) return;
+  const url=vwMatchUrl(cur.ev, m.gn);
+  if(!url) return;
+  try{
+    const r=await fetch(url);
+    if(!r.ok) return;
+    const html=await r.text();
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const cards=[...doc.querySelectorAll('a.fm-card-wrap.-photo')].slice(0,6);
+    if(!cards.length || !containerEl.isConnected) return;
+    const items=cards.map(a=>{
+      // Cloudinary generiert eigene Groessenvarianten nicht automatisch (getestet: 404) —
+      // daher das Originalbild direkt einbetten, nicht selbst eine Thumbnail-Transformation bauen.
+      const full=a.getAttribute('href')||'';
+      const cap=(a.getAttribute('data-caption')||'').replace(/"/g,'&quot;');
+      return `<a href="${full}" target="_blank" rel="noopener" title="${cap}"><img loading="lazy" src="${full}" alt=""></a>`;
+    }).join('');
+    containerEl.innerHTML=`<div class="mdphotos-lab">Fotos <span class="mdphotos-src">· volleyballworld.com</span></div>
+      <div class="mdphotos-grid">${items}</div>`;
+  }catch(e){ /* Slug passt vermutlich nicht — Sektion bleibt leer, kein Fehler sichtbar */ }
 }
 // Alle 15s neu laden, aber nur solange der Drawer offen bleibt UND tatsaechlich ein
 // Match gerade laeuft (nicht bloss "Turnier im Zeitraum live") — spart Anfragen, wenn
@@ -2048,6 +2117,11 @@ function toggleMatch(row){
   det.toggleAttribute('hidden', !show);
   row.classList.toggle('open', show);
   row.setAttribute('aria-expanded', show);
+  if(show){
+    const m=cur && cur.byN[+row.dataset.n];
+    const photosEl=det.querySelector('.mdphotos');
+    if(m && photosEl) loadMatchPhotos(m, photosEl);
+  }
 }
 // Match-Detail-Modal (für Klick im Baum)
 const mscrim=document.getElementById('mscrim'), mmodal=document.getElementById('mmodal');
@@ -2055,9 +2129,12 @@ function openMatchModal(n){
   const m=cur.byN[+n]; if(!m) return;
   const res = played(m) ? ` · ${m.sa}:${m.sb}` : '';
   document.getElementById('mmTitle').innerHTML = `${roundLabel(m.rc,m.rn)}${res}<b>${teamFlag(m.ca)}${m.a} vs ${teamFlag(m.cb)}${m.b}</b>`;
-  document.getElementById('mmBody').innerHTML = `<div class="mdetail">${buildMatchDetail(m)}</div>`;
+  const mmBody=document.getElementById('mmBody');
+  mmBody.innerHTML = `<div class="mdetail">${buildMatchDetail(m)}</div>`;
   mscrim.classList.add('open'); mmodal.classList.add('open'); mmodal.setAttribute('aria-hidden','false');
   document.getElementById('mmClose').focus();
+  const photosEl=mmBody.querySelector('.mdphotos');
+  if(photosEl) loadMatchPhotos(m, photosEl);
 }
 function closeMatchModal(){
   mscrim.classList.remove('open'); mmodal.classList.remove('open'); mmodal.setAttribute('aria-hidden','true');
@@ -2141,7 +2218,8 @@ function personalEncounters(noA,noB){
         const sideOf = no => pa.includes(no) ? 'a' : (pb.includes(no) ? 'b' : null);
         const aSide=sideOf(noA), bSide=sideOf(noB);
         if(!aSide || !bSide || aSide===bSide) continue;  // beide dabei, aber auf verschiedenen Seiten
-        out.push({m, city:((sd.venues||{})[tno]||{}).city||'', aSide});
+        const ev=eventForTournament(sd,tno);
+        out.push({m, city:((sd.venues||{})[tno]||{}).city||'', tier: ev?ev.tier:'', aSide});
       }
     }
   }
@@ -2162,14 +2240,14 @@ function renderH2HCompareResult(){
   }
   let wa=0,wb=0;
   const rows=enc.sort((x,y)=>(y.m.date||'').localeCompare(x.m.date||''))
-    .map(({m,city,aSide})=>{
+    .map(({m,city,tier,aSide})=>{
       const aWon=(+m.sa>+m.sb)===(aSide==='a');
       if(aWon) wa++; else wb++;
       const teamA=aSide==='a'?m.a:m.b, teamB=aSide==='a'?m.b:m.a;
       const fedA=aSide==='a'?m.ca:m.cb, fedB=aSide==='a'?m.cb:m.ca;
       const scoreA=aSide==='a'?`${m.sa}:${m.sb}`:`${m.sb}:${m.sa}`;
       return `<div class="h2r"><span class="h2d">${m.date||''}</span>
-        <span class="h2c">${city} · ${roundLabel(m.rc,m.rn)}</span>
+        <span class="h2c">${tier?tier+' · ':''}${city} · ${roundLabel(m.rc,m.rn)}</span>
         <span class="h2teams">${teamFlag(fedA)}${teamA} – ${teamFlag(fedB)}${teamB}</span>
         <span class="h2s${aWon?' lead':''}">${scoreA}</span></div>`;
     }).join('');
