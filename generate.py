@@ -211,6 +211,11 @@ def get_matches(no):
             "crt": a.get("Court"),
             "sda": num(a.get("TeamAPositionInMainDraw")), "sdb": num(a.get("TeamBPositionInMainDraw")),
             "rf": refs,
+            # globale VIS-Matchnummer (nicht die turnierinterne NoInTournament) — "No" wird von
+            # VIS immer mitgeliefert, auch ohne es in Fields anzufordern. Identisch mit der
+            # Match-ID, die volleyballworld.com fuer seine eigene (undokumentierte) Live-API
+            # verwendet — als Fallback, wenn VIS selbst noch keinen Punktestand hochgeladen hat.
+            "gn": num(a.get("No")),
         }
         # optionale Extras (oft leer)
         for src, dst, f in [("Temperature", "temp", float), ("Humidity", "hum", num), ("NbSpectators", "spec", num)]:

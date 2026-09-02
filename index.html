@@ -1281,6 +1281,7 @@ async function fetchLiveMatches(no){
       sets, fa:feederL(g('TeamAType')), fb:feederL(g('TeamBType')), d:durs,
       ca:g('TeamAFederationCode')||'', cb:g('TeamBFederationCode')||'', crt:g('Court')||'',
       sda:numL(g('TeamAPositionInMainDraw')), sdb:numL(g('TeamBPositionInMainDraw')), rf:refs,
+      gn:numL(g('No')),
     };
     const temp=g('Temperature'); if(temp && temp!=='0') rec.temp=parseFloat(temp);
     const hum=g('Humidity'); if(hum && hum!=='0') rec.hum=numL(hum);
@@ -1515,6 +1516,42 @@ function openFromHash(){
     loadSeason(+s, true).then(openIt);
   } else openIt();
 }
+// Fallback fuer Live-Punktestaende, wenn VIS selbst noch nichts hochgeladen hat (siehe
+// NbLiveScoreUpload-Beobachtung: manche Turniere/Veranstalter melden Punkte verzoegert oder
+// gar nicht an VIS). volleyballworld.com betreibt dafuer eine eigene, undokumentierte Live-API
+// unter derselben globalen VIS-Matchnummer (empirisch verifiziert: No/gn stimmt exakt ueberein).
+// Bewusst nur als Ergaenzung, nicht als Ersatz: VIS bleibt die primaere, offiziell fuer Dritte
+// freigegebene Quelle; dieser Fallback kann jederzeit ohne Ankuendigung aufhoeren zu
+// funktionieren, ohne dass etwas an der eigentlichen Funktionalitaet kaputtgeht.
+const vwLiveCache={};
+async function fetchVWLiveScore(gn){
+  if(vwLiveCache[gn]!==undefined) return vwLiveCache[gn];
+  try{
+    const r=await fetch(`https://en-live.volleyballworld.com/api/v1/live/beach/matches/${gn}`);
+    const j=r.ok ? await r.json() : null;
+    vwLiveCache[gn]=j;
+    return j;
+  }catch(e){ vwLiveCache[gn]=null; return null; }
+}
+// Nur die Saetze/Zwischenstaende uebernehmen, "st" (Status) bewusst unangetastet lassen — sobald
+// VIS selbst nachzieht, greift wieder die normale, offizielle Quelle. isLive()/played() erkennen
+// ein Match mit Saetzen aber ohne st="15" bereits von selbst als "laeuft gerade".
+function applyVWFallback(m, vw){
+  if(!vw || played(m)) return m;
+  const sets=(vw.sets||[]).filter(s=>s.pointsTeamA||s.pointsTeamB).map(s=>[s.pointsTeamA,s.pointsTeamB]);
+  if(!sets.length) return m;
+  return {...m, sets, sa:String(vw.matchPointsA??0), sb:String(vw.matchPointsB??0)};
+}
+// Fuer Matches, deren angesetzte Zeit schon vorbei ist, VIS aber noch keine Saetze zeigt, den
+// VW-Fallback versuchen — sonst bleibt "unbekannter Ausgang" faelschlich stundenlang stehen.
+async function enrichWithVWFallback(matches){
+  const now=new Date();
+  const candidates=matches.filter(m=>!played(m) && m.gn && m.date && m.time && new Date(`${m.date}T${m.time}`)<=now);
+  if(!candidates.length) return matches;
+  const vwResults=await Promise.all(candidates.map(m=>fetchVWLiveScore(m.gn)));
+  const byN=new Map(); candidates.forEach((m,i)=>byN.set(m.n,vwResults[i]));
+  return matches.map(m=>byN.has(m.n) ? applyVWFallback(m,byN.get(m.n)) : m);
+}
 // Alle 15s neu laden, aber nur solange der Drawer offen bleibt UND tatsaechlich ein
 // Match gerade laeuft (nicht bloss "Turnier im Zeitraum live") — spart Anfragen, wenn
 // gerade Pause ist.
@@ -1526,8 +1563,9 @@ function startLivePoll(ev,no){
   livePollTimer=setInterval(async ()=>{
     if(!cur || cur.ev!==ev || cur.no!==no){ stopLivePoll(); return; }
     try{
-      const fresh=await fetchLiveMatches(no);
+      let fresh=await fetchLiveMatches(no);
       if(!fresh.length || !cur || cur.ev!==ev || cur.no!==no) return;
+      fresh=await enrichWithVWFallback(fresh);
       DATA.results[no]=fresh; cur.matches=fresh;
       const byN2={}; fresh.forEach(m=>byN2[m.n]=m); cur.byN=byN2;
       reRenderKeepOpen();
@@ -2415,7 +2453,10 @@ async function refreshTopLiveMatches(){
   const nos=[];
   for(const e of liveNow){ if(e.M) nos.push(e.M.no); if(e.W) nos.push(e.W.no); }
   await Promise.all(nos.map(async no=>{
-    try{ const fresh=await fetchLiveMatches(no); if(fresh.length) DATA.results[no]=fresh; }catch(err){ /* naechster Tick versucht es erneut */ }
+    try{
+      let fresh=await fetchLiveMatches(no);
+      if(fresh.length){ fresh=await enrichWithVWFallback(fresh); DATA.results[no]=fresh; }
+    }catch(err){ /* naechster Tick versucht es erneut */ }
   }));
   render();
 }
