@@ -225,6 +225,11 @@
   .vt[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);}
   .vt:hover{color:var(--ink);}
   .vt[hidden]{display:none;}
+  /* eigene Zeile unter dem Ansicht-/Geschlecht-Schalter, leicht abgesetzter Farbton */
+  .phasetoggle{margin-top:8px;background:color-mix(in srgb,var(--water) 8%,var(--surface-2));
+    border-color:color-mix(in srgb,var(--water) 25%,var(--line));}
+  .phasetoggle .vt[aria-pressed="true"]{background:color-mix(in srgb,var(--water) 16%,var(--surface));
+    color:var(--water);}
   /* Feeder-Slot (offener KO-Platz) */
   .team.feeder .tn{color:var(--faint);font-style:italic;}
   .team .feedref{font-family:var(--mono);font-style:normal;font-size:10.5px;color:#8A6FE0;
@@ -399,7 +404,7 @@
   .dband.group{color:var(--water);}
   .dband.quali{color:var(--faint);}
   .dsub{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--faint);margin:16px 0 6px;display:flex;align-items:center;gap:8px;}
+    color:var(--muted);margin:16px 0 6px;display:flex;align-items:center;gap:8px;}
   .dsub .pooltick{width:9px;height:9px;border-radius:3px;}
   .standings{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:12.5px;}
   .standings th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
@@ -596,11 +601,11 @@
         <button class="vt" data-view="seeds" type="button" aria-pressed="false">Setzliste</button>
         <button class="vt" data-view="ranking" type="button" aria-pressed="false">Ranking</button>
       </div>
-      <div class="vtoggle" id="phaseToggle" role="group" aria-label="Turnierphase" hidden>
-        <button class="vt" data-phase="quali" type="button" aria-pressed="false">Quali</button>
-        <button class="vt" data-phase="pool" type="button" aria-pressed="false">Pool</button>
-        <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO</button>
-      </div>
+    </div>
+    <div class="vtoggle phasetoggle" id="phaseToggle" role="group" aria-label="Turnierphase" hidden>
+      <button class="vt" data-phase="quali" type="button" aria-pressed="false">Quali</button>
+      <button class="vt" data-phase="pool" type="button" aria-pressed="false">Pool</button>
+      <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO</button>
     </div>
   </header>
   <div id="dChamp"></div>
@@ -2152,7 +2157,9 @@ document.getElementById('vtoggle').addEventListener('click',e=>{
 });
 document.getElementById('phaseToggle').addEventListener('click',e=>{
   const b=e.target.closest('.vt'); if(!b||b.hidden)return;
-  listPhase=b.dataset.phase; setView('list');
+  listPhase=b.dataset.phase;
+  document.querySelectorAll('#phaseToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  setView('list');
 });
 // Match aufklappen (Detail: Satz-für-Satz, Dauer, Schiris …)
 function toggleMatch(row){
