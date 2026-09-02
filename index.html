@@ -373,7 +373,7 @@
      rechtsbuendig, nur minimal weiter rechts/unten als die alte (verschachtelte) Position.
      width:fit-content statt volle Breite, damit die Trennlinie nur so breit wie die Box
      selbst ist, nicht quer ueber den ganzen Baum. */
-  .bkt-bronze{margin-top:2px;margin-left:auto;width:fit-content;padding-top:6px;padding-right:8px;
+  .bkt-bronze{margin-top:-6px;margin-left:auto;width:fit-content;padding-top:4px;padding-right:8px;
     border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:flex-end;}
   .bkt-bronze .blab{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--gold);margin-bottom:6px;}
@@ -2295,13 +2295,44 @@ document.getElementById('themebtn').addEventListener('click',()=>{
 // ---- Saisonauswahl ----
 const FIRST_SEASON = 2013;
 let season = DATA.season;
-function buildSeasonSelect(){
+// FIVB veroeffentlicht den Kalender oft schon Monate im Voraus, und der Cron erzeugt
+// data/<naechstes-jahr>.json bereits proaktiv (siehe update.yml) — daher hier pruefen, ob es
+// dafuer schon echte Turniere gibt, statt starr bis zum 1.1. mit dem neuen Jahr zu warten.
+async function buildSeasonSelect(){
   const sel = document.getElementById('seasonSel');
-  const maxY = Math.max(DATA.season, new Date().getFullYear());
+  let maxY = Math.max(DATA.season, new Date().getFullYear());
+  try{
+    const r = await fetch(`./data/${maxY+1}.json`, {cache:'no-store'});
+    if(r.ok){
+      const j = await r.json();
+      if(j && j.events && j.events.length) maxY += 1;
+    }
+  }catch(e){ /* naechstes Jahr noch nicht angelegt — bleibt aussen vor */ }
   let opts = '';
   for(let y=maxY; y>=FIRST_SEASON; y--) opts += `<option value="${y}">${y}</option>`;
   sel.innerHTML = opts;
   sel.value = season;
+}
+// Beim Laden nicht blind die in index.html eingebettete (moeglicherweise veraltete) Saison
+// uebernehmen, sondern das tatsaechliche Kalenderjahr versuchen — damit die Seite z.B. ab dem
+// 1.1. automatisch die neue Saison zeigt, ohne dass index.html manuell neu gebaut werden muss.
+async function bootstrapSeason(){
+  const guess = new Date().getFullYear();
+  if(guess !== DATA.season){
+    try{
+      const r = await fetch(`./data/${guess}.json`, {cache:'no-store'});
+      if(r.ok){
+        const j = await r.json();
+        if(j && j.events && j.results){
+          season = guess;
+          applyData(j);
+          document.getElementById('seasonSel').value = season;
+          return;
+        }
+      }
+    }catch(e){ /* Fallback unten: eingebettete Saison still aktualisieren */ }
+  }
+  await loadSeason(season, true);
 }
 
 // ---- Saison-Cache fuer saisonuebergreifendes Head-to-Head ----
@@ -2355,6 +2386,7 @@ async function loadSeason(y, silent){
     const changed = j.generated!==DATA.generated || j.season!==DATA.season;
     season = y;
     applyData(j);
+    document.getElementById('seasonSel').value = season;
     if(!silent) flash(changed ? `Aktualisiert · Stand ${fmtDate(j.generated)}` : 'Bereits aktuell.');
   }catch(e){
     document.getElementById('seasonSel').value = season;
@@ -2394,7 +2426,7 @@ buildSeasonSelect();
 DATA.events.forEach((e,i)=>e._idx=i);
 render(); updateStand(); updateMeta();
 ensureTopLivePoll();
-// erst die aktuelle Saison-Datei still nachziehen (applyData schliesst sonst einen per
-// Hash bereits geoeffneten Drawer wieder), danach ggf. Turnier aus dem Link-Hash oeffnen
-loadSeason(season, true).then(openFromHash);
+// erst die (ggf. neuere) Saison still nachziehen (applyData schliesst sonst einen per Hash
+// bereits geoeffneten Drawer wieder), danach ggf. Turnier aus dem Link-Hash oeffnen
+bootstrapSeason().then(openFromHash);
 </script>

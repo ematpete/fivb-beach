@@ -25,6 +25,9 @@ jobs:
       - name: Aktuelle Saison erzeugen
         run: python generate.py
 
+      - name: Nächste Saison erzeugen (falls FIVB Turniere schon angelegt hat)
+        run: SEASON=$(( $(date -u +%Y) + 1 )) python generate.py
+
       - name: Änderungen committen
         run: |
           git config user.name  "vis-bot"
