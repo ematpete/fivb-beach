@@ -233,6 +233,7 @@
   /* Bracket */
   .bkt-note{color:var(--faint);font-size:13px;padding:8px 2px 4px;}
   .bkt-scroll{overflow-x:auto;padding:6px 2px 12px;}
+  .bkt-wrap{width:max-content;}
   .bkt{display:flex;min-width:max-content;--brk:var(--line);}
   .rnd{display:flex;flex-direction:column;flex:1 0 200px;min-width:200px;}
   .rnd .rlab{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;
@@ -397,7 +398,7 @@
   .dband.inter{color:#8A6FE0;}
   .dband.group{color:var(--water);}
   .dband.quali{color:var(--faint);}
-  .dsub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  .dsub{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
     color:var(--faint);margin:16px 0 6px;display:flex;align-items:center;gap:8px;}
   .dsub .pooltick{width:9px;height:9px;border-radius:3px;}
   .standings{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:12.5px;}
@@ -594,6 +595,11 @@
         <button class="vt" data-view="bracket" type="button" aria-pressed="false">Baum</button>
         <button class="vt" data-view="seeds" type="button" aria-pressed="false">Setzliste</button>
         <button class="vt" data-view="ranking" type="button" aria-pressed="false">Ranking</button>
+      </div>
+      <div class="vtoggle" id="phaseToggle" role="group" aria-label="Turnierphase" hidden>
+        <button class="vt" data-phase="quali" type="button" aria-pressed="false">Quali</button>
+        <button class="vt" data-phase="pool" type="button" aria-pressed="false">Pool</button>
+        <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO</button>
       </div>
     </div>
   </header>
@@ -1276,7 +1282,7 @@ const slotText = S => S.feeder
   ? `<span class="feedref">${S.name}</span>${S.sub?`<span class="feedteams"> ${S.sub}</span>`:''}`
   : `${teamFlag(S.fed)}${S.name}${seedTag(S.seed)}`;
 
-let cur=null, drawerView='list';
+let cur=null, drawerView='list', listPhase='ko';
 
 // Direktabruf beim FIVB VIS (CORS-offen) — umgeht den bis zu 20-minütigen Cache von data/<jahr>.json,
 // baut dieselbe Match-Struktur wie generate.py's get_matches() nach.
@@ -1474,6 +1480,18 @@ function updateDrawerContent(){
 
   document.querySelector('#vtoggle .vt[data-view="bracket"]').hidden = !bracketOK;
   if(!bracketOK && drawerView==='bracket') drawerView='list';
+
+  // Phasen-Umschalter (Quali/Pool/KO): Knoepfe ein-/ausblenden je nachdem, was es ueberhaupt
+  // gibt, und die aktuell gewaehlte Phase auf eine verfuegbare umschwenken, falls sie (z.B. nach
+  // einem Live-Refresh) nicht mehr existiert. Die eigentliche Auswahl selbst bleibt sonst
+  // unangetastet, damit ein stiller Hintergrund-Refresh die Nutzerwahl nicht zuruecksetzt.
+  cur.avail = availablePhases(matches);
+  if(!cur.avail[listPhase]) listPhase = cur.avail.ko ? 'ko' : cur.avail.pool ? 'pool' : cur.avail.quali ? 'quali' : 'ko';
+  const pt=document.getElementById('phaseToggle');
+  pt.querySelectorAll('.vt').forEach(b=>{
+    b.hidden = !cur.avail[b.dataset.phase];
+    b.setAttribute('aria-pressed', b.dataset.phase===listPhase);
+  });
 }
 // offene Match-Details vor einem Neu-Render merken und danach wiederherstellen
 function reRenderKeepOpen(){
@@ -1496,6 +1514,7 @@ function openDrawer(ev,gender){
   const byN={}; matches.forEach(m=>byN[m.n]=m);
   cur={no,city:ev.city,tier:ev.tier,org:ev.org,matches,byN,ev,gender:g,mNo,wNo};
   if(ev.status==='upcoming') drawerView='seeds';
+  listPhase=currentPhase(matches);
 
   updateDrawerContent();
   setView(drawerView);
@@ -1651,6 +1670,8 @@ function setView(v){
   drawerView=v;
   document.querySelectorAll('#vtoggle .vt').forEach(b=>b.setAttribute('aria-pressed', b.dataset.view===v));
   drawer.classList.toggle('wide', v==='bracket');
+  const availCount = cur.avail ? Object.values(cur.avail).filter(Boolean).length : 0;
+  document.getElementById('phaseToggle').hidden = v!=='list' || availCount<2;
   const body=document.getElementById('dBody');
   if(v==='ranking'){
     const no=cur.no, matches=cur.matches;
@@ -1693,7 +1714,7 @@ function setView(v){
     body.scrollTop=0;
     return;
   }
-  body.innerHTML = v==='bracket' ? renderBracket() : renderList();
+  body.innerHTML = v==='bracket' ? renderBracket() : renderList(listPhase);
   body.scrollTop=0;
 }
 
@@ -1734,7 +1755,7 @@ function renderPoolStandings(rm, allMatches){
     <th class="n">Sätze</th><th class="n">Bälle</th></tr></thead><tbody>${trs}</tbody></table>`;
 }
 
-function renderList(){
+function renderList(phase){
   const {matches}=cur;
   const offset=venueOffsetMinutes(cur.ev.country, cur.ev.start);
   const chainInfo=computeChainOrder(matches);
@@ -1789,40 +1810,54 @@ function renderList(){
     return out;
   };
 
-  const hasGroup = codes.some(c=>c.macro==='group');
+  if(phase==='pool'){
+    const groupCodes=codes.filter(c=>c.macro==='group');
+    if(!groupCodes.length) return '<div class="bkt-note">Für dieses Turnier gibt es keine Gruppenphase.</div>';
+    return groupCodes.map(c=>renderRound(c.rc,c.rn)).join('');
+  }
+  if(phase==='quali'){
+    const qualiCodes=codes.filter(c=>c.macro==='quali');
+    if(!qualiCodes.length) return '<div class="bkt-note">Für dieses Turnier gibt es keine Qualifikation.</div>';
+    return qualiCodes.map(c=>renderRound(c.rc,c.rn)).join('');
+  }
+  // phase==='ko' (Finalphase + Zwischenrunde) — Standardansicht
   const elimCodes = codes.filter(c=>c.macro==='final'||c.macro==='inter');
+  if(!elimCodes.length) return '<div class="bkt-note">Für dieses Turnier liegt noch keine Finalrunden-Ansetzung vor.</div>';
   const elimHasRealTeams = elimCodes.some(({rc})=>rmOf(rc).some(m=>m.a && m.b));
-  const collapseElim = hasGroup && elimCodes.length>0 && !elimHasRealTeams;
-
-  let body='';
-  if(hasGroup){
-    body += `<a href="#" class="jumplink" data-jump="gruppenphase-jump">↓ Zur Gruppenphase</a>`;
+  const collapseElim = !elimHasRealTeams && codes.some(c=>c.macro==='group'||c.macro==='quali');
+  let elimBody='', curMacro='';
+  for(const c of elimCodes){
+    if(c.macro!==curMacro){ curMacro=c.macro; const mc=MACRO[c.macro];
+      elimBody += `<div class="dband ${mc.cls}"><span class="ico"><span>${mc.ico}</span></span>${mc.lab}</div>`; }
+    elimBody += renderRound(c.rc,c.rn);
   }
-
-  if(elimCodes.length){
-    let elimBody='', curMacro='';
-    for(const c of elimCodes){
-      if(c.macro!==curMacro){ curMacro=c.macro; const mc=MACRO[c.macro];
-        elimBody += `<div class="dband ${mc.cls}"><span class="ico"><span>${mc.ico}</span></span>${mc.lab}</div>`; }
-      elimBody += renderRound(c.rc,c.rn);
-    }
-    body += collapseElim
-      ? `<details class="elim-collapsed"><summary>Finalphase — Paarungen stehen noch nicht fest</summary>${elimBody}</details>`
-      : elimBody;
+  return collapseElim
+    ? `<details class="elim-collapsed" open><summary>Finalphase — Paarungen stehen noch nicht fest</summary>${elimBody}</details>`
+    : elimBody;
+}
+// Welche Phasen ueberhaupt Runden haben — steuert, welche Toggle-Knoepfe sichtbar sind.
+function availablePhases(matches){
+  const macros=new Set(matches.map(m=>macroOf(m.rc,m.rn)));
+  return {
+    ko: macros.has('final') || macros.has('inter'),
+    pool: macros.has('group'),
+    quali: macros.has('quali'),
+  };
+}
+// Bei einem Live-Turnier automatisch die Phase zeigen, in der gerade gespielt wird; sonst die
+// am weitesten fortgeschrittene Phase mit mindestens einem Ergebnis; ohne jedes Ergebnis die
+// fruehste Phase mit ueberhaupt angesetzten Matches.
+function currentPhase(matches){
+  const toPhase = macro => macro==='quali' ? 'quali' : macro==='group' ? 'pool' : 'ko';
+  const live=matches.find(isLive);
+  if(live) return toPhase(macroOf(live.rc,live.rn));
+  for(const macro of ['final','inter','group','quali']){
+    if(matches.some(m=>macroOf(m.rc,m.rn)===macro && isFinished(m))) return toPhase(macro);
   }
-
-  let curMacro='', firstGroup=true;
-  for(const c of codes){
-    if(c.macro!=='group' && c.macro!=='quali') continue;
-    if(c.macro!==curMacro){
-      curMacro=c.macro; const mc=MACRO[c.macro];
-      const anchor = (c.macro==='group' && firstGroup) ? ' id="gruppenphase-jump"' : '';
-      if(c.macro==='group') firstGroup=false;
-      body += `<div class="dband ${mc.cls}"${anchor}><span class="ico"><span>${mc.ico}</span></span>${mc.lab}</div>`;
-    }
-    body += renderRound(c.rc,c.rn);
+  for(const macro of ['quali','group','inter','final']){
+    if(matches.some(m=>macroOf(m.rc,m.rn)===macro)) return toPhase(macro);
   }
-  return body;
+  return 'ko';
 }
 
 // Setzliste: alle Teams des Turniers, sortiert nach Setzposition, mit Land und
@@ -2060,9 +2095,12 @@ function renderDoubleKO(matches, repechageCodes){
 function renderBracket(){
   const {matches}=cur;
   // Trost-/Platzierungsrunden fuer Verlierer erkennen (z.B. "Loser are ranked 7th") — dafuer
-  // eigenes Double-KO-Layout statt der reinen Halbierungskette.
+  // eigenes Double-KO-Layout statt der reinen Halbierungskette. "LL" (Lucky Losers) ausdruecklich
+  // ausschliessen: jedes normale Elite-Turnier hat so eine Runde ("Lucky losers" im Namen),
+  // die sonst faelschlich als Repechage-Format erkannt wird und Pools/Quali ungefiltert als
+  // normale Baum-Spalten mit reinzieht (siehe renderDoubleKO's mainCodes-Filter).
   const repechageCodes=[...new Set(matches.map(m=>m.rc))].filter(rc=>{
-    if(['R64','R48','R32','R24','R16','R12','QF','SF','F1','F3','BM'].includes(rc) || isQuali(rc) || isPool(rc)) return false;
+    if(['R64','R48','R32','R24','R16','R12','QF','SF','F1','F3','BM','LL'].includes(rc) || isQuali(rc) || isPool(rc)) return false;
     const rn=(matches.find(m=>m.rc===rc)||{}).rn||'';
     return /ranked|loser/i.test(rn);
   });
@@ -2089,8 +2127,11 @@ function renderBracket(){
     : '';
   // Bronze-Box bewusst AUSSERHALB der Spalten-Flexbox (wie im Double-KO-Layout) — haengt sie
   // innerhalb der Finalspalte, blaeht sie deren Hoehe auf und zieht dadurch die Verbinder-Linie
-  // der Halbfinal-Spalte (haelt sich an der Gesamthoehe) viel zu weit nach unten.
-  return `<div class="bkt-scroll"><div class="bkt">${cols}</div></div>${bronze}${note}`;
+  // der Halbfinal-Spalte (haelt sich an der Gesamthoehe) viel zu weit nach unten. Trotzdem
+  // INNERHALB von .bkt-scroll (nicht danach) und in einem eigenen .bkt-wrap mit derselben
+  // Breite wie .bkt, sonst scrollt sie nicht mit und "margin-left:auto" richtet sich an der
+  // sichtbaren Scroll-Breite statt an der Finalspalte aus.
+  return `<div class="bkt-scroll"><div class="bkt-wrap"><div class="bkt">${cols}</div>${bronze}</div></div>${note}`;
 }
 function closeDrawer(){
   stopLivePoll();
@@ -2108,6 +2149,10 @@ document.addEventListener('keydown',e=>{
 });
 document.getElementById('vtoggle').addEventListener('click',e=>{
   const b=e.target.closest('.vt'); if(!b||b.hidden)return; setView(b.dataset.view);
+});
+document.getElementById('phaseToggle').addEventListener('click',e=>{
+  const b=e.target.closest('.vt'); if(!b||b.hidden)return;
+  listPhase=b.dataset.phase; setView('list');
 });
 // Match aufklappen (Detail: Satz-für-Satz, Dauer, Schiris …)
 function toggleMatch(row){
@@ -2370,11 +2415,6 @@ ptScrim.addEventListener('click',closePointsBreakdown);
 document.getElementById('ptClose').addEventListener('click',closePointsBreakdown);
 
 document.getElementById('dBody').addEventListener('click',e=>{
-  const jump=e.target.closest('.jumplink');
-  if(jump){ e.preventDefault();
-    document.getElementById('gruppenphase-jump')?.scrollIntoView({behavior:'smooth', block:'start'});
-    return;
-  }
   const box=e.target.closest('.bx.clickable'); if(box){ openMatchModal(box.dataset.n); return; }
   const pts=e.target.closest('.pts-click'); if(pts){ openPointsBreakdown(pts.dataset.p1no,pts.dataset.p2no,pts.dataset.team); return; }
   const row=e.target.closest('.match.expandable'); if(row) toggleMatch(row);
