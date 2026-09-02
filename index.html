@@ -2168,6 +2168,16 @@ function toggleMatch(row){
   const det=row.nextElementSibling;
   if(!det || !det.classList.contains('mdetail')) return;
   const show=det.hasAttribute('hidden');
+  if(show){
+    // Akkordeon: nur ein Match gleichzeitig offen — andere zuklappen, bevor dieses aufgeht.
+    document.querySelectorAll('#dBody .match.open').forEach(other=>{
+      if(other===row) return;
+      const otherDet=other.nextElementSibling;
+      if(otherDet && otherDet.classList.contains('mdetail')) otherDet.setAttribute('hidden','');
+      other.classList.remove('open');
+      other.setAttribute('aria-expanded','false');
+    });
+  }
   det.toggleAttribute('hidden', !show);
   row.classList.toggle('open', show);
   row.setAttribute('aria-expanded', show);
