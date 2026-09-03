@@ -757,7 +757,11 @@ const tierGroup = t => TIER_TO_GROUP[t] || null;
 // beim Verbandswechsel wird die Auswahl bewusst zurueckgesetzt, nicht uebernommen, da die
 // Chip-Schluessel zwischen Verbaenden nichts miteinander zu tun haben.
 function buildTierChips(){
-  const groups=ORG_TIER_GROUPS[state.org]||[];
+  const allGroups=ORG_TIER_GROUPS[state.org]||[];
+  // Nur Chips fuer Stufen zeigen, zu denen es in der aktuell geladenen Saison tatsaechlich
+  // mindestens ein Turnier gibt — sonst wirkt ein leerer Filter wie ein Bug ("0 Ergebnisse").
+  const orgTiers=new Set(DATA.events.filter(e=>e.org===state.org).map(e=>e.tier));
+  const groups=allGroups.filter(g=>g.tiers.some(t=>orgTiers.has(t)));
   const el=document.getElementById('tierChips');
   el.hidden=groups.length===0;
   state.tiers={};
@@ -2696,7 +2700,7 @@ function applyData(j){
   closeDrawer();
   DATA=j; resultNos=new Set(Object.keys(DATA.results));
   DATA.events.forEach((e,i)=>e._idx=i);
-  render(); updateStand(); updateMeta();
+  buildTierChips(); render(); updateStand(); updateMeta();
   ensureTopLivePoll();
 }
 async function loadSeason(y, silent){
