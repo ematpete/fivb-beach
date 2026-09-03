@@ -85,6 +85,12 @@ def classify(name, code="", teams=None, season=None, default_city=""):
     # Points), sonst faellt sie fuer Saisons >= 2023 komplett durchs Raster.
     if re.search(r"FIVB Beach Volleyball World Championships", n, re.I):
         return ("FIVB", "World Champs", default_city.strip() or "World Championships")
+    # Nachwuchs-WM (z.B. "FIVB BVB U18 WCHs The Hague") — landet sonst in der allgemeinen
+    # AGE_RE-Ausschlussregel weiter unten (dort bewusst fuer Zonal-Qualis/Satelliten gedacht,
+    # nicht fuer die eigene FIVB-Flaggschiff-Nachwuchs-WM).
+    m_youth = re.search(r"FIVB\s+BVB\s+U(\d{2})\s+WCHs?", n, re.I)
+    if m_youth:
+        return ("FIVB", "Youth Champs", default_city.strip() or f"U{m_youth.group(1)} World Championships")
     if "CEV Test" in n:
         return None
     if re.search(r"CEV|EuroBeachVolley|European Championship", n, re.I):

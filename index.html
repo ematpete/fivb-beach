@@ -81,6 +81,7 @@
      statt dass jede Gruppe erzwungen eine eigene Zeile bekommt */
   .filterbar{display:flex;flex-wrap:wrap;align-items:center;row-gap:8px;column-gap:16px;}
   .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .chips[hidden]{display:none;}
   .chip{font-size:12.5px;font-weight:500;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;
     display:inline-flex;align-items:center;gap:6px;transition:background .12s,color .12s,border-color .12s;}
@@ -585,6 +586,7 @@
       <button class="chip" data-tier="Elite" aria-pressed="true">Elite</button>
       <button class="chip" data-tier="Challenge" aria-pressed="true">Challenge</button>
       <button class="chip" data-tier="Futures" aria-pressed="false">Futures</button>
+      <button class="chip" data-tier="Youth" aria-pressed="false">Nachwuchs</button>
     </div>
     </div>
     </div>
@@ -691,7 +693,7 @@ let DATA = {"season":2026,"generated":"2026-08-13","events":[{"org":"FIVB","tier
 
 const TIER_COLOR = {Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
-  'World Tour':'#3E7CB1','World Champs':'#B0304A',Masters:'#8A63D2',National:'#8E7355'};
+  'World Tour':'#3E7CB1','World Champs':'#B0304A','Youth Champs':'#C77A97',Masters:'#8A63D2',National:'#8E7355'};
 const tierColor = t => TIER_COLOR[t] || '#79868E';
 const ORG_LABEL = {FIVB:'FIVB',CEV:'CEV',OEVV:'ÖVV',DVV:'DVV'};
 const orgLabel = o => ORG_LABEL[o] || o;
@@ -713,12 +715,13 @@ function eventResultNo(ev){
 }
 
 // State
-const state={q:'',org:'FIVB',tiers:{Elite:true,Challenge:true,Futures:false}};
+const state={q:'',org:'FIVB',tiers:{Elite:true,Challenge:true,Futures:false,Youth:false}};
 // Tier eines Events der Filter-Gruppe zuordnen (Elite16 zaehlt zu "Elite"); alles andere
 // (Nations Cup, CEV Tour, EuroBeach, EM, Legacy-Tour, Finals/"Event") ist von diesem
 // Filter nicht betroffen — CEV wird stattdessen komplett ueber den Verband-Filter gesteuert.
 const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite'
-  : (t==='Challenge'||t==='Futures') ? t : null;
+  : (t==='Challenge'||t==='Futures') ? t
+  : (t==='Youth Champs') ? 'Youth' : null;
 
 // Land -> IANA-Zeitzone. Deckt die Laender ab, die im Datensatz vorkommen. Bei Laendern mit
 // mehreren Zeitzonen (USA, Kanada, Australien, Russland, Brasilien, Mexiko …) wird die fuer
@@ -2531,6 +2534,13 @@ function wireChips(id,key,attr){
   });
 }
 wireChips('orgChips','org','org');
+// Stufen-Filter (Elite/Challenge/Futures/Nachwuchs) betreffen nur FIVB-Turniere — bei anderen
+// Verbaenden ausblenden, damit nicht der Eindruck entsteht, sie wuerden dort auch greifen.
+function updateTierChipsVisibility(){
+  document.getElementById('tierChips').hidden = state.org!=='FIVB';
+}
+document.getElementById('orgChips').addEventListener('click', updateTierChipsVisibility);
+updateTierChipsVisibility();
 // Stufen-Filter: unabhaengige Toggles (kein Radio-Verhalten wie bei den anderen Chip-Gruppen)
 document.getElementById('tierChips').addEventListener('click',e=>{
   const b=e.target.closest('.chip'); if(!b) return;
