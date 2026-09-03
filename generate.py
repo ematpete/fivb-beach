@@ -100,10 +100,12 @@ def classify(name, code="", teams=None, season=None, default_city=""):
         if "European Championship" in n:
             m = re.search(r"U\d\d", n)
             # Nachwuchs-EM (U18/U20/U22) als eigene Stufe, damit sie sich im Frontend getrennt
-            # von der Senioren-EM filtern laesst (vorher beides "EM", nur am Stadtnamen erkennbar).
+            # filtern laesst. Die Senioren-EM lief bis 2024 unter dem Namen "European
+            # Championships", seit 2025 nennt CEV dieselbe Veranstaltung "EuroBeachVolley" -
+            # beides ist dasselbe Turnier, daher hier bewusst dieselbe Stufe wie "EuroBeach".
             if m:
                 return ("CEV", "Youth EM", f"{m.group(0)} Europameisterschaft")
-            return ("CEV", "EM", "EM")
+            return ("CEV", "EuroBeach", "EuroBeachVolley")
         if "Nations Cup" in n:
             if re.search(r"-\s*(MEN|WOMEN)", n):
                 return ("CEV", "Nations Cup", "Nations Cup Finals")
@@ -111,11 +113,12 @@ def classify(name, code="", teams=None, season=None, default_city=""):
             return ("CEV", "Nations Cup", city)
         if n.startswith("CEVP"):
             return ("CEV", "CEV Tour", re.sub(r"^CEVP\s*-\s*", "", n).strip())
-        # alte CEV-Turnierform (vor 2023): ECH-Finals und "Masters"-Tour explizit,
+        # alte CEV-Turnierform (vor 2018): "ECH Final" ist wiederum nur ein weiterer
+        # historischer Name derselben Senioren-EM/EuroBeachVolley, "Masters"-Tour explizit,
         # Rest nur wenn kein Jugend-/Satelliten-/Zonal-Rauschen
         if re.search(r"\bECH\b", n) and not AGE_RE.search(n):
             city = re.sub(r"^CEV\s+ECH\s*(Final)?\s*-?\s*", "", n, flags=re.I).strip()
-            return ("CEV", "EM", city or "EM")
+            return ("CEV", "EuroBeach", city or "EuroBeachVolley")
         if re.search(r"\bMasters\b", n, re.I):
             city = re.sub(r"^CEV\s+", "", re.sub(r"\s+Masters\b", "", n, flags=re.I)).strip()
             return ("CEV", "Masters", city)
