@@ -64,6 +64,9 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .themebtn:disabled{opacity:.6;cursor:default;}
   #refreshbtn{color:var(--water);border-color:color-mix(in srgb,var(--water) 35%,var(--line));}
   #refreshbtn:hover:not(:disabled){background:color-mix(in srgb,var(--water) 10%,transparent);}
+  .countrysel{font-size:12.5px;padding:6px 10px;border-radius:999px;}
+  #countrySel:not([data-active="1"]){color:var(--faint);}
+  #countrySel[data-active="1"]{color:var(--water);border-color:color-mix(in srgb,var(--water) 35%,var(--line));}
   .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
     background:var(--ink);color:var(--bg);font-size:13px;font-weight:500;padding:11px 18px;border-radius:11px;
     box-shadow:0 10px 34px rgba(0,0,0,.3);z-index:100;max-width:min(440px,90vw);text-align:center;
@@ -165,6 +168,8 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .livechip .pulse{width:6px;height:6px;border-radius:50%;background:#fff;
     box-shadow:0 0 0 0 #fff;animation:pulse 1.6s infinite;}
   .match.inprogress{background:color-mix(in srgb,var(--green) 6%,transparent);border-radius:8px;}
+  .match.hl-country{box-shadow:inset 3px 0 0 var(--water);background:color-mix(in srgb,var(--water) 7%,transparent);border-radius:8px;padding-left:9px;}
+  .nextrow.hl-country{background:color-mix(in srgb,var(--water) 10%,transparent);border-radius:6px;padding:2px 6px;margin:0 -6px;}
   .match .setline .sc.live{color:var(--green);font-weight:700;position:relative;}
   .mdetail .sk.live,.mdetail .ssc.live{color:var(--green);}
   .mdetail .ssc.live{font-weight:700;}
@@ -598,6 +603,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
       <button class="chip" data-org="MEVZA" aria-pressed="false"><span class="dot" style="color:#4E8F5C"></span>MEVZA</button>
     </div>
     <div class="chips" id="tierChips" role="group" aria-label="Stufe"></div>
+    <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
     </div>
     </div>
 
@@ -726,7 +732,11 @@ function eventResultNo(ev){
 }
 
 // State
-const state={q:'',org:'FIVB',tiers:{}};
+let savedCountryPref=''; try{ savedCountryPref=localStorage.getItem('countryPref')||''; }catch(e){}
+const state={q:'',org:'FIVB',tiers:{},country:savedCountryPref};
+// Matches mit Beteiligung eines Teams aus dem bevorzugten Land hervorheben (Listen- und
+// Turnier-Widgets) — reine Optik, kein Filter, daher unabhaengig von allen anderen Kriterien.
+const isCountryHl = (ca,cb) => !!state.country && (ca===state.country || cb===state.country);
 // Pro Verband eigene Stufen-Chipgruppe (Rohwerte aus classify() -> zusammengefasster Chip).
 // "def" = initial aktiv. Verbaende ohne Eintrag (bzw. mit nur einer moeglichen Stufe wie
 // ÖVV/DVV "National") zeigen gar keine Stufenzeile — da gibt es nichts zu filtern.
@@ -769,6 +779,24 @@ function buildTierChips(){
     state.tiers[g.key]=g.def;
     return `<button class="chip" data-tier="${g.key}" aria-pressed="${g.def}">${g.label}</button>`;
   }).join('');
+}
+
+// Laender-Dropdown aus den tatsaechlich in der geladenen Saison vorkommenden Team-Verbandscodes
+// aufbauen (kein statisches Land-Register noetig) — Auswahl bleibt beim Saisonwechsel erhalten,
+// wenn der Code dort noch vorkommt, sonst wird sie stillschweigend zurueckgesetzt.
+function buildCountrySelect(){
+  const codes=new Set();
+  for(const arr of Object.values(DATA.results||{})) for(const m of arr){
+    if(m.ca) codes.add(m.ca);
+    if(m.cb) codes.add(m.cb);
+  }
+  const sorted=[...codes].sort();
+  if(!sorted.includes(state.country)) state.country='';
+  const sel=document.getElementById('countrySel');
+  sel.innerHTML=`<option value="">🌍 Land hervorheben…</option>`
+    + sorted.map(c=>`<option value="${c}">${flagEmoji(c)} ${c}</option>`).join('');
+  sel.value=state.country;
+  sel.dataset.active=state.country?'1':'0';
 }
 
 // Land -> IANA-Zeitzone. Deckt die Laender ab, die im Datensatz vorkommen. Bei Laendern mit
@@ -860,7 +888,7 @@ function nextUpHtml(e){
   const next=nextUpMatches(e);
   if(!next.length) return '';
   const offset=venueOffsetMinutes(e.country, e.start);
-  const rows=next.map(({m,g})=>`<div class="nextrow"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
+  const rows=next.map(({m,g})=>`<div class="nextrow${isCountryHl(m.ca,m.cb)?' hl-country':''}"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
       <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span></div>`).join('');
   return `<div class="nextup"><div class="nextlab">Als Nächstes</div>${rows}</div>`;
 }
@@ -879,7 +907,7 @@ function liveNowHtml(e){
   const rows=live.map(({m,g})=>{
     const cur=(m.sets&&m.sets.length)?m.sets[m.sets.length-1]:null;
     const score=`${m.sa||0}:${m.sb||0}${cur?` <span class="livecur">(${cur[0]}:${cur[1]})</span>`:''}`;
-    return `<div class="nextrow liverow"><span class="livechip"><span class="pulse"></span>Live</span><span class="nextg">${g}</span>
+    return `<div class="nextrow liverow${isCountryHl(m.ca,m.cb)?' hl-country':''}"><span class="livechip"><span class="pulse"></span>Live</span><span class="nextg">${g}</span>
       <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span><span class="livescore">${score}</span></div>`;
   }).join('');
   return `<div class="nextup">${rows}</div>`;
@@ -1917,7 +1945,7 @@ function renderList(phase){
         const A=slotInfo(m,'a'), B=slotInfo(m,'b');
         // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
         const preview = m.a && m.b;
-        out += `<div class="match sched${preview?' expandable':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Head-to-Head ${m.a} gegen ${m.b}"`:''}>
+        out += `<div class="match sched${preview?' expandable':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Head-to-Head ${m.a} gegen ${m.b}"`:''}>
           <span class="match-no">#${m.n}</span>
           <div class="mt">${mtLabel}</div>
           <div class="teams">
@@ -1931,7 +1959,7 @@ function renderList(phase){
       }
       const live=isLive(m), aWin=!live && +m.sa>+m.sb;
       const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
-      out += `<div class="match expandable${live?' inprogress':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
+      out += `<div class="match expandable${live?' inprogress':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="Match-Details ${m.a} gegen ${m.b}">
         <span class="match-no">#${m.n}</span>
         <div class="mt">${mtLabel}</div>
         <div class="teams">
@@ -2602,6 +2630,14 @@ wireChips('orgChips','org','org');
 // CEV: EuroBeach/EM/Nations Cup/CEV Tour/Under Age, ...) — beim Verbandswechsel neu aufbauen.
 document.getElementById('orgChips').addEventListener('click', ()=>{ buildTierChips(); render(); });
 buildTierChips();
+document.getElementById('countrySel').addEventListener('change',e=>{
+  state.country=e.target.value;
+  e.target.dataset.active=state.country?'1':'0';
+  try{ localStorage.setItem('countryPref', state.country); }catch(err){}
+  render();
+  if(cur) reRenderKeepOpen();
+});
+buildCountrySelect();
 // Stufen-Filter: unabhaengige Toggles (kein Radio-Verhalten wie bei den anderen Chip-Gruppen)
 document.getElementById('tierChips').addEventListener('click',e=>{
   const b=e.target.closest('.chip'); if(!b) return;
@@ -2700,7 +2736,7 @@ function applyData(j){
   closeDrawer();
   DATA=j; resultNos=new Set(Object.keys(DATA.results));
   DATA.events.forEach((e,i)=>e._idx=i);
-  buildTierChips(); render(); updateStand(); updateMeta();
+  buildTierChips(); buildCountrySelect(); render(); updateStand(); updateMeta();
   ensureTopLivePoll();
 }
 async function loadSeason(y, silent){
