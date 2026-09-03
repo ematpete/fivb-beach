@@ -8,6 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Beach Volleyball">
+<script>
+// So frueh wie moeglich (vor dem <style>-Block), damit beim Neuladen nicht kurz das falsche
+// Theme aufblitzt, bevor die gespeicherte Wahl angewendet wird.
+try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAttribute('data-theme', t); }catch(e){}
+</script>
 <style>
   :root{
     --bg:#F1EEE6; --surface:#FBFAF6; --surface-2:#F5F2EA;
@@ -117,6 +122,13 @@
   .gender{font-family:var(--mono);font-size:10.5px;color:var(--faint);border:1px solid var(--line);
     border-radius:6px;padding:1px 6px;letter-spacing:.05em;}
   .right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+  /* Direkt-Zugriff Herren/Damen, ohne erst die Zeile (= Herren-Default) zu oeffnen — klein
+     genug um nicht zu ueberladen, aber >=26px Kantenlaenge fuer Mobile-Tastbarkeit. */
+  .genderBtns{display:flex;gap:5px;}
+  .genderBtn{width:27px;height:27px;border-radius:7px;border:1px solid var(--line);
+    background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:11.5px;
+    font-weight:700;cursor:pointer;}
+  .genderBtn:hover{color:var(--ink);border-color:var(--faint);background:var(--surface-2);}
   .nextup{grid-column:1/-1;margin-top:6px;padding-top:7px;border-top:1px dashed var(--line);
     display:flex;flex-direction:column;gap:3px;}
   .nextlab{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;
@@ -164,6 +176,7 @@
   .org.FIVB{color:var(--water);border-color:color-mix(in srgb,var(--water) 40%,transparent);}
   .org.OEVV{color:#C1444E;border-color:color-mix(in srgb,#C1444E 45%,transparent);}
   .org.DVV{color:#3E6B8A;border-color:color-mix(in srgb,#3E6B8A 45%,transparent);}
+  .org.MEVZA{color:#4E8F5C;border-color:color-mix(in srgb,#4E8F5C 45%,transparent);}
   .row.clickable{cursor:pointer;}
   .row.clickable:hover{border-color:var(--faint);transform:translateY(-1px);
     box-shadow:0 2px 4px rgba(24,40,49,.08),0 14px 34px rgba(24,40,49,.12);}
@@ -179,7 +192,8 @@
     header.top{flex-direction:column;align-items:stretch;}
     .hdr-actions{gap:8px;}
     .hdr-actions .stand{order:1;flex:1 0 100%;text-align:center;margin-top:2px;}
-    #seasonSel,#refreshbtn,#h2hOpenBtn,#themebtn{flex:1 1 auto;text-align:center;}
+    #seasonSel,#refreshbtn,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
+    #themebtn{flex:0 0 auto;padding-left:14px;padding-right:14px;}
     .h2hpicker{flex-direction:column;align-items:stretch;}
     .h2hvs{padding-top:0;text-align:center;}
     .h2hCompare .h2r{grid-template-columns:1fr auto;grid-template-areas:"d s" "c c" "t t";row-gap:2px;}
@@ -565,7 +579,7 @@
       <button class="themebtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
       <span class="stand" id="stand"></span>
       <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden">⟳ Aktualisieren</button>
-      <button class="themebtn" id="themebtn" type="button">◑ Theme</button>
+      <button class="themebtn" id="themebtn" type="button" title="Theme wechseln" aria-label="Theme wechseln">◑</button>
     </div>
   </header>
 
@@ -581,13 +595,9 @@
       <button class="chip" data-org="CEV" aria-pressed="false"><span class="dot" style="color:#7C5BD6"></span>CEV</button>
       <button class="chip" data-org="OEVV" aria-pressed="false"><span class="dot" style="color:#C1444E"></span>ÖVV</button>
       <button class="chip" data-org="DVV" aria-pressed="false"><span class="dot" style="color:#3E6B8A"></span>DVV</button>
+      <button class="chip" data-org="MEVZA" aria-pressed="false"><span class="dot" style="color:#4E8F5C"></span>MEVZA</button>
     </div>
-    <div class="chips" id="tierChips" role="group" aria-label="Stufe">
-      <button class="chip" data-tier="Elite" aria-pressed="true">Elite</button>
-      <button class="chip" data-tier="Challenge" aria-pressed="true">Challenge</button>
-      <button class="chip" data-tier="Futures" aria-pressed="false">Futures</button>
-      <button class="chip" data-tier="Youth" aria-pressed="false">Nachwuchs</button>
-    </div>
+    <div class="chips" id="tierChips" role="group" aria-label="Stufe"></div>
     </div>
     </div>
 
@@ -693,9 +703,10 @@ let DATA = {"season":2026,"generated":"2026-08-13","events":[{"org":"FIVB","tier
 
 const TIER_COLOR = {Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
-  'World Tour':'#3E7CB1','World Champs':'#B0304A','Youth Champs':'#C77A97',Masters:'#8A63D2',National:'#8E7355'};
+  'World Tour':'#3E7CB1','World Champs':'#B0304A','Youth Champs':'#C77A97',Masters:'#8A63D2',National:'#8E7355',
+  'Zonal Tour':'#4E8F5C'};
 const tierColor = t => TIER_COLOR[t] || '#79868E';
-const ORG_LABEL = {FIVB:'FIVB',CEV:'CEV',OEVV:'ÖVV',DVV:'DVV'};
+const ORG_LABEL = {FIVB:'FIVB',CEV:'CEV',OEVV:'ÖVV',DVV:'DVV',MEVZA:'MEVZA'};
 const orgLabel = o => ORG_LABEL[o] || o;
 const CC_FIX = {'01':'Great Britain'};
 const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -715,13 +726,46 @@ function eventResultNo(ev){
 }
 
 // State
-const state={q:'',org:'FIVB',tiers:{Elite:true,Challenge:true,Futures:false,Youth:false}};
-// Tier eines Events der Filter-Gruppe zuordnen (Elite16 zaehlt zu "Elite"); alles andere
-// (Nations Cup, CEV Tour, EuroBeach, EM, Legacy-Tour, Finals/"Event") ist von diesem
-// Filter nicht betroffen — CEV wird stattdessen komplett ueber den Verband-Filter gesteuert.
-const tierGroup = t => (t==='Elite16'||t==='Elite') ? 'Elite'
-  : (t==='Challenge'||t==='Futures') ? t
-  : (t==='Youth Champs') ? 'Youth' : null;
+const state={q:'',org:'FIVB',tiers:{}};
+// Pro Verband eigene Stufen-Chipgruppe (Rohwerte aus classify() -> zusammengefasster Chip).
+// "def" = initial aktiv. Verbaende ohne Eintrag (bzw. mit nur einer moeglichen Stufe wie
+// ÖVV/DVV "National") zeigen gar keine Stufenzeile — da gibt es nichts zu filtern.
+const ORG_TIER_GROUPS = {
+  FIVB: [
+    {key:'Elite', label:'Elite', tiers:['Elite16','Elite'], def:true},
+    {key:'Challenge', label:'Challenge', tiers:['Challenge'], def:true},
+    {key:'Futures', label:'Futures', tiers:['Futures'], def:false},
+    {key:'Youth', label:'Nachwuchs', tiers:['Youth Champs'], def:false},
+  ],
+  CEV: [
+    {key:'EuroBeach', label:'EuroBeach', tiers:['EuroBeach'], def:true},
+    {key:'EM', label:'EM', tiers:['EM'], def:true},
+    {key:'NationsCup', label:'Nations Cup', tiers:['Nations Cup'], def:true},
+    {key:'CEVTour', label:'CEV Tour', tiers:['CEV Tour','Masters','CEV'], def:true},
+    {key:'YouthEM', label:'Under Age', tiers:['Youth EM'], def:false},
+  ],
+  MEVZA: [
+    {key:'ZonalTour', label:'Zonal Tour', tiers:['Zonal Tour'], def:true},
+  ],
+};
+// Rohtier -> Chip-Gruppenschluessel, ueber alle Verbaende hinweg (render() filtert vorher schon
+// auf den gewaehlten Verband, daher reicht eine einzige globale Zuordnung ohne Ueberschneidungen).
+const TIER_TO_GROUP={};
+for(const groups of Object.values(ORG_TIER_GROUPS)) for(const g of groups) for(const t of g.tiers) TIER_TO_GROUP[t]=g.key;
+const tierGroup = t => TIER_TO_GROUP[t] || null;
+// Stufen-Chips fuer den aktuell gewaehlten Verband neu aufbauen (Label + Default-Zustand) —
+// beim Verbandswechsel wird die Auswahl bewusst zurueckgesetzt, nicht uebernommen, da die
+// Chip-Schluessel zwischen Verbaenden nichts miteinander zu tun haben.
+function buildTierChips(){
+  const groups=ORG_TIER_GROUPS[state.org]||[];
+  const el=document.getElementById('tierChips');
+  el.hidden=groups.length===0;
+  state.tiers={};
+  el.innerHTML=groups.map(g=>{
+    state.tiers[g.key]=g.def;
+    return `<button class="chip" data-tier="${g.key}" aria-pressed="${g.def}">${g.label}</button>`;
+  }).join('');
+}
 
 // Land -> IANA-Zeitzone. Deckt die Laender ab, die im Datensatz vorkommen. Bei Laendern mit
 // mehreren Zeitzonen (USA, Kanada, Australien, Russland, Brasilien, Mexiko …) wird die fuer
@@ -867,7 +911,10 @@ function eventRow(e, showNextUp){
         </div>
         <div class="country">${country(e.country)}</div>
       </div>
-      <div class="right">${st}${cue}</div>
+      <div class="right">${st}${cue}${(e.M && e.W && rNo) ? `<div class="genderBtns">
+        <button class="genderBtn" data-g="M" type="button" data-idx="${e._idx}" aria-label="Herren ${e.city} öffnen">H</button>
+        <button class="genderBtn" data-g="W" type="button" data-idx="${e._idx}" aria-label="Damen ${e.city} öffnen">D</button>
+      </div>` : ''}</div>
       ${showNextUp ? liveNowHtml(e)+nextUpHtml(e) : ''}
     </div>`;
 }
@@ -1537,9 +1584,14 @@ function updateDrawerContent(){
 }
 // offene Match-Details vor einem Neu-Render merken und danach wiederherstellen
 function reRenderKeepOpen(){
+  // setView() setzt body.scrollTop sonst unconditional auf 0 zurueck — beim Live-Poll (alle 15s)
+  // fuehrte das dazu, dass die Ansicht waehrend des Lesens immer wieder nach oben sprang.
+  const body=document.getElementById('dBody');
+  const scrollPos=body.scrollTop;
   const openNos=[...document.querySelectorAll('.mdetail:not([hidden])')].map(el=>el.dataset.for);
   updateDrawerContent();
   setView(drawerView);
+  body.scrollTop=scrollPos;
   openNos.forEach(n=>{
     const row=document.querySelector(`.match[data-n="${n}"]`);
     if(row) toggleMatch(row);
@@ -2526,6 +2578,14 @@ document.getElementById('dBody').addEventListener('keydown',e=>{
 
 // Controls
 document.getElementById('q').addEventListener('input',e=>{state.q=e.target.value;render();});
+// Direkt-Zugriff Herren/Damen in der Turnierzeile — Delegation auf #list, da die Zeilen bei
+// jedem render() neu erzeugt werden; stopPropagation() verhindert, dass zusaetzlich der
+// Zeilen-Klick (oeffnet mit Herren-Default) mitfeuert.
+document.getElementById('list').addEventListener('click',e=>{
+  const gb=e.target.closest('.genderBtn'); if(!gb) return;
+  e.stopPropagation();
+  openDrawer(DATA.events[+gb.dataset.idx], gb.dataset.g);
+});
 function wireChips(id,key,attr){
   document.getElementById(id).addEventListener('click',e=>{
     const b=e.target.closest('.chip'); if(!b)return;
@@ -2534,13 +2594,10 @@ function wireChips(id,key,attr){
   });
 }
 wireChips('orgChips','org','org');
-// Stufen-Filter (Elite/Challenge/Futures/Nachwuchs) betreffen nur FIVB-Turniere — bei anderen
-// Verbaenden ausblenden, damit nicht der Eindruck entsteht, sie wuerden dort auch greifen.
-function updateTierChipsVisibility(){
-  document.getElementById('tierChips').hidden = state.org!=='FIVB';
-}
-document.getElementById('orgChips').addEventListener('click', updateTierChipsVisibility);
-updateTierChipsVisibility();
+// Stufen-Chips sind je Verband unterschiedlich (FIVB: Elite/Challenge/Futures/Nachwuchs,
+// CEV: EuroBeach/EM/Nations Cup/CEV Tour/Under Age, ...) — beim Verbandswechsel neu aufbauen.
+document.getElementById('orgChips').addEventListener('click', ()=>{ buildTierChips(); render(); });
+buildTierChips();
 // Stufen-Filter: unabhaengige Toggles (kein Radio-Verhalten wie bei den anderen Chip-Gruppen)
 document.getElementById('tierChips').addEventListener('click',e=>{
   const b=e.target.closest('.chip'); if(!b) return;
@@ -2550,10 +2607,13 @@ document.getElementById('tierChips').addEventListener('click',e=>{
   render();
 });
 
-// Theme toggle
+// Theme toggle — Wahl in localStorage merken (siehe auch das fruehe Init-Script ganz oben im
+// <head>, das sie beim naechsten Laden vor dem ersten Paint wieder anwendet).
 document.getElementById('themebtn').addEventListener('click',()=>{
   const isDark = document.documentElement.getAttribute('data-theme')==='dark';
-  document.documentElement.setAttribute('data-theme', isDark?'light':'dark');
+  const next = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try{ localStorage.setItem('theme', next); }catch(e){}
 });
 
 // ---- Saisonauswahl ----

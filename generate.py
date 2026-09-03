@@ -99,7 +99,11 @@ def classify(name, code="", teams=None, season=None, default_city=""):
             return ("CEV", "EuroBeach", city or "EuroBeachVolley")
         if "European Championship" in n:
             m = re.search(r"U\d\d", n)
-            return ("CEV", "EM", (m.group(0) + " Europameisterschaft") if m else "EM")
+            # Nachwuchs-EM (U18/U20/U22) als eigene Stufe, damit sie sich im Frontend getrennt
+            # von der Senioren-EM filtern laesst (vorher beides "EM", nur am Stadtnamen erkennbar).
+            if m:
+                return ("CEV", "Youth EM", f"{m.group(0)} Europameisterschaft")
+            return ("CEV", "EM", "EM")
         if "Nations Cup" in n:
             if re.search(r"-\s*(MEN|WOMEN)", n):
                 return ("CEV", "Nations Cup", "Nations Cup Finals")
@@ -118,6 +122,12 @@ def classify(name, code="", teams=None, season=None, default_city=""):
         if NOISE_RE.search(n) or AGE_RE.search(n):
             return None
         return ("CEV", "CEV", re.sub(r"^CEV\s+", "", n).strip())
+    # MEVZA (Mitteleuropaeische Volleyball-Zonalverbindung: AUT/SUI/SLO/CRO/CZE/HUN/LUX ...) —
+    # nur die Erwachsenen-Turnierserie "Zonal Tour", Jugend-Zonal-Qualis (U18/U20) fallen unten
+    # unter die allgemeine AGE_RE-Ausschlussregel wie bei allen anderen Verbaenden auch.
+    if re.search(r"MEVZA Zonal Tour", n, re.I):
+        city = re.sub(r"^MEVZA\s+Zonal\s+Tour\s+", "", n, flags=re.I).strip()
+        return ("MEVZA", "Zonal Tour", city)
     # OeVV/DVV-Nationaltouren: erst NACH den BPT/CEV-Namensmustern pruefen, damit ein
     # zufaellig kollidierender Code (z.B. "MGER2025" fuer die echte CEV EuroBeachVolley
     # in Duesseldorf) nicht faelschlich als Nationaltour-Stopp durchrutscht.
