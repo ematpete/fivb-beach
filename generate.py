@@ -133,8 +133,12 @@ def classify(name, code="", teams=None, season=None, default_city=""):
     # in Duesseldorf) nicht faelschlich als Nationaltour-Stopp durchrutscht.
     nat_m = NATIONAL_TOUR_RE.match(code)
     if nat_m and not NOISE_RE.search(n) and not AGE_RE.search(n):
+        # DVV faehrt zwei eigenstaendige Serien unter demselben Code-Praefix "GER": die
+        # Haupttour ("GER NT") und "Rock the Beach" (Kuestenstopps, "GER RTB") - getrennte
+        # Stufe, damit sie sich im Frontend wie bei CEV EM/Youth EM separat filtern lassen.
+        tier = "Rock the Beach" if re.match(r"GER\s+RTB", n, re.I) else "National"
         city = NATIONAL_NAME_PREFIX_RE.sub("", n).strip() or n.strip()
-        return (NATIONAL_ORG[nat_m.group(1)], "National", city)
+        return (NATIONAL_ORG[nat_m.group(1)], tier, city)
     # Alte FIVB-Turnierform (vor 2023): kein "BPT"-Tag, Name = reiner Ortsname.
     # Unterscheidung Top-Tour vs. Zonal/Satellit/Quali ueber Hauptfeldgroesse,
     # da der Turniername selbst keine Stufe mehr angibt.
@@ -217,10 +221,19 @@ def get_matches(no):
             rn = a.get(f"Referee{i}Name")
             if rn:
                 refs.append(f"{rn}|{a.get(f'Referee{i}FederationCode') or ''}")
+        sa, sb = a.get("MatchPointsA"), a.get("MatchPointsB")
+        if sa in ("", None) and sb in ("", None) and sets:
+            # VIS liefert bei manchen (z.B. nie sauber abgeschlossenen Walkover-)Matches die
+            # Saetze, aber nie die Matchpunkte selbst nach - aus den Saetzen ableiten, sonst
+            # bleibt der Punktestand im Frontend als "undefined" stehen.
+            wa = sum(1 for s in sets if s[0] > s[1])
+            wb = sum(1 for s in sets if s[1] > s[0])
+            if wa != wb:
+                sa, sb = str(wa), str(wb)
         rec = {
             "n": int(a["NoInTournament"]), "date": a.get("LocalDate"), "time": a.get("LocalTime"),
             "a": a.get("TeamAName"), "b": a.get("TeamBName"),
-            "sa": a.get("MatchPointsA"), "sb": a.get("MatchPointsB"),
+            "sa": sa, "sb": sb,
             "rc": a.get("RoundCode"), "rn": a.get("RoundName"), "st": a.get("Status"),
             "sets": sets, "fa": feeder(a.get("TeamAType")), "fb": feeder(a.get("TeamBType")),
             "d": durs, "ca": a.get("TeamAFederationCode"), "cb": a.get("TeamBFederationCode"),

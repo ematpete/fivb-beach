@@ -64,9 +64,9 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .themebtn:disabled{opacity:.6;cursor:default;}
   #refreshbtn{color:var(--water);border-color:color-mix(in srgb,var(--water) 35%,var(--line));}
   #refreshbtn:hover:not(:disabled){background:color-mix(in srgb,var(--water) 10%,transparent);}
-  .countrysel{font-size:12.5px;padding:6px 10px;border-radius:999px;}
-  #countrySel:not([data-active="1"]){color:var(--faint);}
   #countrySel[data-active="1"]{color:var(--water);border-color:color-mix(in srgb,var(--water) 35%,var(--line));}
+  .h2hbtn{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));font-weight:600;}
+  .h2hbtn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);}
   .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
     background:var(--ink);color:var(--bg);font-size:13px;font-weight:500;padding:11px 18px;border-radius:11px;
     box-shadow:0 10px 34px rgba(0,0,0,.3);z-index:100;max-width:min(440px,90vw);text-align:center;
@@ -128,8 +128,8 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   /* Direkt-Zugriff Herren/Damen, ohne erst die Zeile (= Herren-Default) zu oeffnen — klein
      genug um nicht zu ueberladen, aber >=26px Kantenlaenge fuer Mobile-Tastbarkeit. */
   .genderBtns{display:flex;gap:5px;}
-  .genderBtn{width:27px;height:27px;border-radius:7px;border:1px solid var(--line);
-    background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:11.5px;
+  .genderBtn{width:31px;height:31px;border-radius:8px;border:1px solid var(--line);
+    background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:12.5px;
     font-weight:700;cursor:pointer;}
   .genderBtn:hover{color:var(--ink);border-color:var(--faint);background:var(--surface-2);}
   .nextup{grid-column:1/-1;margin-top:6px;padding-top:7px;border-top:1px dashed var(--line);
@@ -197,8 +197,8 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     header.top{flex-direction:column;align-items:stretch;}
     .hdr-actions{gap:8px;}
     .hdr-actions .stand{order:1;flex:1 0 100%;text-align:center;margin-top:2px;}
-    #seasonSel,#refreshbtn,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
-    #themebtn{flex:0 0 auto;padding-left:14px;padding-right:14px;}
+    #seasonSel,#countrySel,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
+    #themebtn,#refreshbtn{flex:0 0 auto;padding-left:14px;padding-right:14px;}
     .h2hpicker{flex-direction:column;align-items:stretch;}
     .h2hvs{padding-top:0;text-align:center;}
     .h2hCompare .h2r{grid-template-columns:1fr auto;grid-template-areas:"d s" "c c" "t t";row-gap:2px;}
@@ -581,9 +581,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     </div>
     <div class="hdr-actions">
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
-      <button class="themebtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
+      <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
+      <button class="themebtn h2hbtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
       <span class="stand" id="stand"></span>
-      <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden">⟳ Aktualisieren</button>
+      <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden" aria-label="Ergebnisse neu laden">⟳</button>
       <button class="themebtn" id="themebtn" type="button" title="Theme wechseln" aria-label="Theme wechseln">◑</button>
     </div>
   </header>
@@ -603,7 +604,6 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
       <button class="chip" data-org="MEVZA" aria-pressed="false"><span class="dot" style="color:#4E8F5C"></span>MEVZA</button>
     </div>
     <div class="chips" id="tierChips" role="group" aria-label="Stufe"></div>
-    <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
     </div>
     </div>
 
@@ -710,7 +710,7 @@ let DATA = {"season":2026,"generated":"2026-08-13","events":[{"org":"FIVB","tier
 const TIER_COLOR = {Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
   'World Tour':'#3E7CB1','World Champs':'#B0304A','Youth Champs':'#C77A97',Masters:'#8A63D2',National:'#8E7355',
-  'Zonal Tour':'#4E8F5C'};
+  'Zonal Tour':'#4E8F5C','Rock the Beach':'#3E6B8A'};
 const tierColor = t => TIER_COLOR[t] || '#79868E';
 const ORG_LABEL = {FIVB:'FIVB',CEV:'CEV',OEVV:'ÖVV',DVV:'DVV',MEVZA:'MEVZA'};
 const orgLabel = o => ORG_LABEL[o] || o;
@@ -752,10 +752,14 @@ const ORG_TIER_GROUPS = {
     {key:'EM', label:'EM', tiers:['EM'], def:true},
     {key:'NationsCup', label:'Nations Cup', tiers:['Nations Cup'], def:true},
     {key:'CEVTour', label:'CEV Tour', tiers:['CEV Tour','Masters','CEV'], def:true},
-    {key:'YouthEM', label:'Under Age', tiers:['Youth EM'], def:false},
+    {key:'YouthEM', label:'Under Age EM', tiers:['Youth EM'], def:false},
   ],
   MEVZA: [
     {key:'ZonalTour', label:'Zonal Tour', tiers:['Zonal Tour'], def:true},
+  ],
+  DVV: [
+    {key:'National', label:'National Tour', tiers:['National'], def:true},
+    {key:'RockTheBeach', label:'Rock the Beach', tiers:['Rock the Beach'], def:true},
   ],
 };
 // Rohtier -> Chip-Gruppenschluessel, ueber alle Verbaende hinweg (render() filtert vorher schon
@@ -931,6 +935,7 @@ function eventRow(e, showNextUp){
     : upcomingNo
       ? `<span class="reslabel">Setzliste<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>`
       : '';
+  const showGenderBtns = e.M && e.W && rNo;
   return `
     <div class="row ${rNo?'clickable':''}" style="--tier:${tv}"
       ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="${resNo?'Ergebnisse':'Setzliste'} ${e.city} öffnen"`:''}>
@@ -939,13 +944,13 @@ function eventRow(e, showNextUp){
         <div class="city">${e.city}
           <span class="badges"><span class="org ${e.org}">${orgLabel(e.org)}</span>
           <span class="tier-badge" style="--tier:${tv}">${e.tier}</span>
-          <span class="gender">${genders||'–'}</span></span>
+          ${!showGenderBtns ? `<span class="gender">${genders||'–'}</span>` : ''}</span>
         </div>
         <div class="country">${country(e.country)}</div>
       </div>
-      <div class="right">${st}${cue}${(e.M && e.W && rNo) ? `<div class="genderBtns">
-        <button class="genderBtn" data-g="M" type="button" data-idx="${e._idx}" aria-label="Herren ${e.city} öffnen">H</button>
-        <button class="genderBtn" data-g="W" type="button" data-idx="${e._idx}" aria-label="Damen ${e.city} öffnen">D</button>
+      <div class="right">${st}${cue}${showGenderBtns ? `<div class="genderBtns">
+        <button class="genderBtn" data-g="M" type="button" data-idx="${e._idx}" aria-label="Herren ${e.city} öffnen">M</button>
+        <button class="genderBtn" data-g="W" type="button" data-idx="${e._idx}" aria-label="Damen ${e.city} öffnen">W</button>
       </div>` : ''}</div>
       ${showNextUp ? liveNowHtml(e)+nextUpHtml(e) : ''}
     </div>`;
@@ -1050,7 +1055,13 @@ const roundLabel=(rc,rn)=>{
 };
 
 const played = m => (m.sets && m.sets.length>0) || m.st==='15';
-const isFinished = m => m.st==='15';
+// Manche VIS-Matches (z.B. nie sauber abgeschlossene Walkover) bleiben dauerhaft auf
+// Status "nicht beendet" haengen, obwohl die Saetze laengst einen klaren Sieger zeigen —
+// ohne diese Zusatzpruefung wuerden sie fuer immer als "Live" haengen bleiben.
+const decisiveSets = m => { if(!m.sets) return 0;
+  const wa=m.sets.filter(s=>s[0]>s[1]).length, wb=m.sets.filter(s=>s[1]>s[0]).length;
+  return Math.max(wa,wb); };
+const isFinished = m => m.st==='15' || decisiveSets(m)>=2;
 const isLive = m => played(m) && !isFinished(m);
 const fmtDur = s => { if(!s) return ''; const m=Math.floor(s/60), ss=Math.round(s%60);
   return ss ? `${m}:${String(ss).padStart(2,'0')}` : `${m}`; };
@@ -1964,8 +1975,8 @@ function renderList(phase){
         <div class="mt">${mtLabel}</div>
         <div class="teams">
           ${liveTag}
-          <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}</span>${setline(m,0)}<span class="pt">${m.sa}</span></div>
-          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}</span>${setline(m,1)}<span class="pt">${m.sb}</span></div>
+          <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}</span>${setline(m,0)}<span class="pt">${m.sa??'–'}</span></div>
+          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}</span>${setline(m,1)}<span class="pt">${m.sb??'–'}</span></div>
         </div>
         <span class="mchev">›</span>
       </div>
@@ -2627,7 +2638,8 @@ function wireChips(id,key,attr){
 }
 wireChips('orgChips','org','org');
 // Stufen-Chips sind je Verband unterschiedlich (FIVB: Elite/Challenge/Futures/Nachwuchs,
-// CEV: EuroBeach/EM/Nations Cup/CEV Tour/Under Age, ...) — beim Verbandswechsel neu aufbauen.
+// CEV: EuroBeach/EM/Nations Cup/CEV Tour/Under Age EM, DVV: National Tour/Rock the Beach, ...)
+// — beim Verbandswechsel neu aufbauen.
 document.getElementById('orgChips').addEventListener('click', ()=>{ buildTierChips(); render(); });
 buildTierChips();
 document.getElementById('countrySel').addEventListener('change',e=>{
@@ -2741,7 +2753,7 @@ function applyData(j){
 }
 async function loadSeason(y, silent){
   const btn=document.getElementById('refreshbtn');
-  if(!silent){ btn.disabled=true; btn.textContent='⟳ Lädt…'; }
+  if(!silent){ btn.disabled=true; btn.title='Lädt…'; }
   try{
     const r=await fetch(`./data/${y}.json`,{cache:'no-store'});
     if(!r.ok) throw 0;
@@ -2758,7 +2770,7 @@ async function loadSeason(y, silent){
       ? 'Keine Live-Daten erreichbar. Bitte später erneut versuchen.'
       : `Keine Daten für Saison ${y} erreichbar.`, true);
   }finally{
-    if(!silent){ btn.disabled=false; btn.textContent='⟳ Aktualisieren'; }
+    if(!silent){ btn.disabled=false; btn.title='Ergebnisse neu laden'; }
   }
 }
 document.getElementById('refreshbtn').addEventListener('click',()=>loadSeason(season, false));
