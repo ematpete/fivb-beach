@@ -64,9 +64,13 @@ NOISE_RE = re.compile(
 # Code-Praefix statt einer Stadt-Abkuerzung (z.B. "MAUT0526" statt "MHAM2025" fuer eine
 # echte BPT-Stadt) — zuverlaessiges Unterscheidungsmerkmal unabhaengig vom Turniernamen.
 # Aeltere Saisons nutzten dafuer noch Stadt-Codes (nicht unterscheidbar) — bleiben aussen vor.
-NATIONAL_TOUR_RE = re.compile(r"^[MW](AUT|GER)\d+$")
+# 2023 alleine nutzte nochmal ein eigenes Zwischenformat mit "NT" im Code selbst (z.B.
+# "MAUTNT01" statt "MAUT0123") — ohne das (NT)? fehlte eine komplette Saison ÖVV/DVV-Turniere.
+NATIONAL_TOUR_RE = re.compile(r"^[MW](AUT|GER)(NT)?\d+$")
 NATIONAL_ORG = {"AUT": "OEVV", "GER": "DVV"}
-NATIONAL_NAME_PREFIX_RE = re.compile(r"^(AUT NT|GER NT|GER RTB)\s*-\s*", re.I)
+NATIONAL_NAME_PREFIX_RE = re.compile(
+    r"^(AUT NT|GER NT|GER RTB)\s*-\s*|"
+    r"^(Austrian Beachvolleyball\s*Tour\s*Pro|German Beach Tour|Rock the Beach)\s+", re.I)
 
 
 def classify(name, code="", teams=None, season=None, default_city=""):
@@ -137,9 +141,10 @@ def classify(name, code="", teams=None, season=None, default_city=""):
     nat_m = NATIONAL_TOUR_RE.match(code)
     if nat_m and not NOISE_RE.search(n) and not AGE_RE.search(n):
         # DVV faehrt zwei eigenstaendige Serien unter demselben Code-Praefix "GER": die
-        # Haupttour ("GER NT") und "Rock the Beach" (Kuestenstopps, "GER RTB") - getrennte
-        # Stufe, damit sie sich im Frontend wie bei CEV EM/Youth EM separat filtern lassen.
-        tier = "Rock the Beach" if re.match(r"GER\s+RTB", n, re.I) else "National"
+        # Haupttour ("GER NT") und "Rock the Beach" (Kuestenstopps, "GER RTB" bzw. 2023 noch
+        # als Klartext "Rock the Beach <Ort>" benannt) - getrennte Stufe, damit sie sich im
+        # Frontend wie bei CEV EM/Youth EM separat filtern lassen.
+        tier = "Rock the Beach" if re.match(r"GER\s+RTB", n, re.I) or re.search(r"Rock the Beach", n, re.I) else "National"
         city = NATIONAL_NAME_PREFIX_RE.sub("", n).strip() or n.strip()
         return (NATIONAL_ORG[nat_m.group(1)], tier, city)
     # Alte FIVB-Turnierform (vor 2023): kein "BPT"-Tag, Name = reiner Ortsname.
