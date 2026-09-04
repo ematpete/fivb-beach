@@ -430,6 +430,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .dsub{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
     color:var(--muted);margin:16px 0 6px;display:flex;align-items:center;gap:8px;}
   .dsub .pooltick{width:9px;height:9px;border-radius:3px;}
+  .entrycount{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint);}
+  .qbadge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--water);
+    border:1px solid color-mix(in srgb,var(--water) 45%,var(--line));border-radius:5px;padding:0 4px;
+    margin-left:5px;vertical-align:middle;}
   .standings{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:12.5px;}
   .standings th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
     text-transform:uppercase;color:var(--faint);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--line);}
@@ -641,7 +645,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
       <div class="vtoggle" id="vtoggle" role="group" aria-label="Ansicht">
         <button class="vt" data-view="list" type="button" aria-pressed="true">Liste</button>
         <button class="vt" data-view="bracket" type="button" aria-pressed="false">Baum</button>
-        <button class="vt" data-view="seeds" type="button" aria-pressed="false">Setzliste</button>
+        <button class="vt" data-view="seeds" type="button" aria-pressed="false">Teams</button>
         <button class="vt" data-view="ranking" type="button" aria-pressed="false">Ranking</button>
       </div>
     </div>
@@ -758,7 +762,7 @@ function applyStaticI18n(){
   attr('vtoggle','aria-label',t('Ansicht','View'));
   document.querySelector('#vtoggle .vt[data-view="list"]').textContent=t('Liste','List');
   document.querySelector('#vtoggle .vt[data-view="bracket"]').textContent=t('Baum','Bracket');
-  document.querySelector('#vtoggle .vt[data-view="seeds"]').textContent=t('Setzliste','Seeding');
+  document.querySelector('#vtoggle .vt[data-view="seeds"]').textContent='Teams';
   attr('phaseToggle','aria-label',t('Turnierphase','Phase'));
   attr('mmClose','aria-label',t('Schließen','Close'));
   attr('photoLb','aria-label',t('Foto','Photo'));
@@ -2176,19 +2180,28 @@ function renderSeedList(pointsByKey){
     return `<tr><td class="pos">${sr.seed||'–'}</td><td class="nm">${sr.name} ${fed(sr.fed)}</td>
     <td class="entry">${sr.entry}</td><td class="n">${ptsCell}</td><td class="seedres ${sr.cls}">${sr.result}</td></tr>`;
   }).join('');
+  // Ein echter Draw existiert per Definition erst nach der Setzung — hier also immer die
+  // Setzungspunkte zeigen, nicht die (laengst ueberholten) Einstiegspunkte vom Meldeschluss.
   return `<table class="standings"><thead><tr><th class="n">${t('Setzung','Seed')}</th><th>Team</th><th>${t('Start','Entry')}</th>
-    <th class="n">${t('Punkte (Einstieg)','Points (entry)')}</th><th>${t('Stand','Status')}</th></tr></thead>
+    <th class="n">${t('Punkte (Setzung)','Points (seeding)')}</th><th>${t('Stand','Status')}</th></tr></thead>
     <tbody>${trs}</tbody></table>
     <p class="bkt-note">${POINTS_RULE_NOTE()}</p>`;
 }
-// Vorlaeufige Meldeliste (Hauptfeld/Quali/Reserve) aus allen gemeldeten Teams nach
-// Einstiegspunkten, solange FIVB noch keinen echten Draw mit Setzliste veroeffentlicht hat.
-// Naeherung: die tatsaechliche Zusammensetzung kann durch Wildcards/Verbandsquoten abweichen.
+// Vorlaeufige Team-Liste (Hauptfeld/Quali/Reserve/Abgemeldet) aus allen gemeldeten Teams,
+// solange FIVB noch keinen echten Draw mit Setzliste veroeffentlicht hat. Einteilung ueber die
+// offiziellen VIS-Felder IsInMainDraw/IsInQualification + Status (BeachTeam-Doku auf
+// fivb.org/VisSDK), nicht mehr ueber eine reine Positions-Schaetzung nach Punkten — empirisch
+// gegen fivb.12ndr.at verifiziert: IsInMainDraw+IsInQualification zugleich = aus der Quali schon
+// ins Hauptfeld nachgerueckt; IsInReserve wird von VIS in der Praxis so gut wie nie gesetzt
+// (selbst bei von 12ndr klar als "Reserve" gefuehrten Teams leer) und ist daher kein
+// brauchbares Signal — Status!=0 (0="Registered") trennt Reserve (noch aktiv) zuverlaessig von
+// Abgemeldet (Status 2 "Withdrawn"/3 "WithdrawnWithMedicalCert" u.a.).
 const entryTiersCache={};
 async function fetchEntryTiers(no){
   if(entryTiersCache[no]) return entryTiersCache[no];
   const fields="No EntryPoints NoPlayer1 NoPlayer2 Player1FirstName Player1LastName "
-    +"Player2FirstName Player2LastName Player1FederationCode Player2FederationCode";
+    +"Player2FirstName Player2LastName Player1FederationCode Player2FederationCode "
+    +"IsInMainDraw IsInQualification Status";
   const teamXml=`<Request Type='GetBeachTeamList' Fields='${fields}'><Filter NoTournament='${no}'/></Request>`;
   const tourXml=`<Request Type='GetBeachTournament' No='${no}' Fields='NbTeamsMainDraw NbTeamsQualification Deadline'/>`;
   const [teamRes,tourRes]=await Promise.all([
@@ -2202,42 +2215,52 @@ async function fetchEntryTiers(no){
   const rows=[];
   for(const el of teamDoc.getElementsByTagName('BeachTeam')){
     const g=n=>el.getAttribute(n);
-    const points=numL(g('EntryPoints'));
-    if(points==null) continue;
+    const inMD=g('IsInMainDraw')==='1', inQu=g('IsInQualification')==='1';
+    const withdrawn=(g('Status')||'0')!=='0';
     rows.push({
-      points, p1no:g('NoPlayer1'), p2no:g('NoPlayer2'),
+      points: numL(g('EntryPoints')), p1no:g('NoPlayer1'), p2no:g('NoPlayer2'),
       p1:`${g('Player1FirstName')||''} ${g('Player1LastName')||''}`.trim(),
       p2:`${g('Player2FirstName')||''} ${g('Player2LastName')||''}`.trim(),
       fed:g('Player1FederationCode')||g('Player2FederationCode')||'',
+      tier: inMD ? 'main' : inQu ? 'quali' : withdrawn ? 'withdrawn' : 'reserve',
+      fromQuali: inMD && inQu,
     });
   }
-  rows.sort((a,b)=>b.points-a.points);
+  rows.sort((a,b)=>(b.points??-1)-(a.points??-1));
   const tEl=tourDoc.querySelector('BeachTournament');
   const mainDraw=numL(tEl&&tEl.getAttribute('NbTeamsMainDraw'))||0;
   const quali=numL(tEl&&tEl.getAttribute('NbTeamsQualification'))||0;
   const deadline=(tEl&&tEl.getAttribute('Deadline'))||null;
-  rows.forEach((r,i)=>{
-    r.pos=i+1;
-    r.tier = i<mainDraw ? 'main' : i<mainDraw+quali ? 'quali' : 'reserve';
-  });
   const result={rows,mainDraw,quali,deadline};
   entryTiersCache[no]=result;
   return result;
 }
-const ENTRY_TIER_LABEL = {main:['Hauptfeld','Main draw'],quali:['Quali','Quali'],reserve:['Reserve','Reserve']};
-function renderEntryTiers({rows,mainDraw,quali}){
+const ENTRY_SECTIONS = [
+  ['main',['Hauptfeld','Main draw']], ['quali',['Qualifikation','Qualification']],
+  ['reserve',['Reserve','Reserve']], ['withdrawn',['Abgemeldet','Withdrawn']],
+];
+function renderEntryTiers({rows,deadline}){
   if(!rows.length) return `<div class="bkt-note">${t('Für dieses Turnier liegt noch keine Meldeliste vor.','No entry list available yet for this tournament.')}</div>`;
-  const trs=rows.map(r=>`<tr><td class="pos">${r.pos}</td><td class="nm">${r.p1}/${r.p2} ${fed(r.fed)}</td>
-    <td class="n">${r.points!=null?r.points:'–'}</td><td class="entry">${t(...ENTRY_TIER_LABEL[r.tier])}</td></tr>`).join('');
-  return `<table class="standings"><thead><tr><th class="n">#</th><th>Team</th>
-    <th class="n">${t('Punkte (Einstieg)','Points (entry)')}</th><th>${t('Stand','Status')}</th></tr></thead><tbody>${trs}</tbody></table>
-    <p class="bkt-note">${t(
-      `Vorläufige Meldeliste nach aktuellen Einstiegspunkten (${mainDraw} Hauptfeld-, ${quali} Quali-Plätze) — Wildcards
-      und Verbandsquoten können die tatsächliche Zusammensetzung noch verschieben. Wird durch die echte Setzliste
-      ersetzt, sobald FIVB den Draw veröffentlicht.`,
-      `Provisional entry list based on current entry points (${mainDraw} main-draw, ${quali} qualification spots) —
-      wildcards and federation quotas may still shift the actual field. Will be replaced by the real seeding once
-      FIVB publishes the draw.`)}<br>${POINTS_RULE_NOTE()}</p>`;
+  // Vor dem Meldeschluss sind "aktuelle" und "eingefrorene" Einstiegspunkte identisch (nichts ist
+  // bisher auseinandergelaufen) — danach zeigen wir stattdessen die (naeherungsweise) aktuellen
+  // Setzungspunkte, da VIS selbst kein eigenes "SeedPoints"-Feld liefert.
+  const pastDeadline = deadline && new Date()>=new Date(deadline);
+  const ptsLabel = pastDeadline ? t('Punkte (Setzung)','Points (seeding)') : t('Punkte (Einstieg)','Points (entry)');
+  const sections = ENTRY_SECTIONS.map(([key,label])=>{
+    const items=rows.filter(r=>r.tier===key);
+    if(!items.length) return '';
+    const trs=items.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${r.p1}/${r.p2} ${fed(r.fed)}
+      ${r.fromQuali?`<span class="qbadge" title="${t('Aus der Qualifikation nachgerückt','Advanced from qualification')}">Q</span>`:''}</td>
+      <td class="n">${r.points!=null?r.points:'–'}</td></tr>`).join('');
+    return `<div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
+      <table class="standings"><thead><tr><th class="n">#</th><th>Team</th><th class="n">${ptsLabel}</th></tr></thead>
+      <tbody>${trs}</tbody></table>`;
+  }).join('');
+  return sections + `<p class="bkt-note">${t(
+    `Vorläufige Meldeliste — Wildcards und Verbandsquoten können die tatsächliche Zusammensetzung noch
+    verschieben. Wird durch die echte Setzliste ersetzt, sobald FIVB den Draw veröffentlicht.`,
+    `Provisional entry list — wildcards and federation quotas may still shift the actual field. Will be
+    replaced by the real seeding once FIVB publishes the draw.`)}<br>${POINTS_RULE_NOTE()}</p>`;
 }
 
 function bracketBox(m){
@@ -2657,23 +2680,27 @@ function renderPointsBreakdownBody(p1no, p2no, teamName, asOfDate){
 function openPointsBreakdown(p1no, p2no, teamName){
   document.getElementById('ptTitle').innerHTML = `${t('Punkte-Aufschlüsselung','Points breakdown')}<b>${teamName}</b>`;
   const body=document.getElementById('ptBody');
-  // FIVB friert die angezeigten Einstiegspunkte auf den 1. des Monats ein, in den der Meldeschluss
-  // (Deadline) faellt — nicht "heute" und nicht die Deadline selbst. Empirisch verifiziert an
-  // mehreren Turnieren: erst mit diesem Referenzdatum stimmt "beste 3 von 4" mit dem tatsaechlich
-  // angezeigten Punktestand ueberein.
+  // FIVB friert die Einstiegspunkte auf den 1. des Monats ein, in den der Meldeschluss (Deadline)
+  // faellt — nicht "heute" und nicht die Deadline selbst. Empirisch verifiziert an mehreren
+  // Turnieren: erst mit diesem Referenzdatum stimmt "beste 3 von 4" mit dem tatsaechlich
+  // angezeigten Punktestand ueberein. Nach der Deadline zeigen wir stattdessen die Setzungspunkte
+  // — dafuer einfach mit "heute" als Stichtag neu rechnen, da VIS selbst kein eigenes
+  // "SeedPoints"-Feld fuehrt (siehe fetchEntryTiers).
   // In UTC rechnen: ein lokal konstruiertes Datum ueber toISOString() auszugeben wuerde in
   // Zeitzonen oestlich von UTC (z.B. MESZ) faelschlich einen Tag zurueckfallen.
   const cachedDeadline = entryTiersCache[cur.no]?.deadline;
   let asOfStr;
-  if(cachedDeadline){
+  if(cachedDeadline && new Date()<new Date(cachedDeadline)){
     const dl=new Date(cachedDeadline);
     asOfStr=`${dl.getUTCFullYear()}-${String(dl.getUTCMonth()+1).padStart(2,'0')}-01`;
+  } else if(cachedDeadline){
+    asOfStr=new Date().toISOString().slice(0,10);
   } else {
     const asOf=new Date(cur.ev.start); asOf.setUTCDate(asOf.getUTCDate()-28);
     asOfStr=asOf.toISOString().slice(0,10);
   }
   if(!allSeasonsLoaded){
-    body.innerHTML='<p class="h2hNote">Lädt Turnierhistorie …</p>';
+    body.innerHTML=`<p class="h2hNote">${t('Lädt Turnierhistorie …','Loading tournament history …')}</p>`;
     ensureAllSeasonsLoaded().then(()=>{
       if(ptModal.classList.contains('open')) body.innerHTML=renderPointsBreakdownBody(p1no,p2no,teamName,asOfStr);
     });
