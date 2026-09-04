@@ -125,12 +125,12 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     text-transform:uppercase;padding:2px 7px;border-radius:6px;color:#fff;background:var(--tier);}
   .gender{font-family:var(--mono);font-size:10.5px;color:var(--faint);border:1px solid var(--line);
     border-radius:6px;padding:1px 6px;letter-spacing:.05em;}
-  .right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+  .right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;align-self:start;}
   /* Direkt-Zugriff Herren/Damen, ohne erst die Zeile (= Herren-Default) zu oeffnen — klein
      genug um nicht zu ueberladen, aber >=26px Kantenlaenge fuer Mobile-Tastbarkeit. In derselben
      Zeile wie der Stadtname (rechtsbuendig via margin-left:auto), statt in der .right-Spalte
      gestapelt zu werden — haelt die Zeilenhoehe niedrig. */
-  .genderBtns{display:flex;gap:11px;margin-left:auto;margin-top:6px;}
+  .genderBtns{display:flex;gap:11px;margin-left:auto;}
   .genderBtn{position:relative;width:44px;height:39px;border-radius:10px;border:1px solid var(--line);
     background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:13.5px;
     font-weight:700;cursor:pointer;}
@@ -213,6 +213,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     .h2hCompare .h2c{grid-area:c;}
     .h2hCompare .h2teams{grid-area:t;white-space:normal;}
     .mmodal{width:min(94vw,440px)!important;padding:18px 16px 16px;}
+    .drawer .dclose{width:42px;height:42px;font-size:19px;}
   }
   .empty{text-align:center;color:var(--faint);padding:50px 0;font-size:14px;}
 
@@ -973,7 +974,11 @@ function nextUpHtml(e){
   const offset=venueOffsetMinutes(e.country, e.start);
   const rows=next.map(({m,g})=>`<div class="nextrow${isCountryHl(m.ca,m.cb)?' hl-country':''}"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
       <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span></div>`).join('');
-  return `<div class="nextup"><div class="nextlab">${t('Als Nächstes','Up next')}</div>${rows}</div>`;
+  // Klick irgendwo im Block soll direkt zum passenden Geschlecht springen, statt immer zum
+  // Herren-Default — nur eindeutig, wenn ausschliesslich ein Geschlecht in "Als Naechstes" steht.
+  const gset=new Set(next.map(({g})=>g));
+  const gender=gset.size===1 ? [...gset][0] : 'M';
+  return `<div class="nextup nextup-click" data-idx="${e._idx}" data-gender="${gender}"><div class="nextlab">${t('Als Nächstes','Up next')}</div>${rows}</div>`;
 }
 // Matches, die JETZT laufen (nicht nur "Turnier im Zeitraum live") — Zwischenstand direkt
 // in der Hauptliste, ohne dass man dafuer den Drawer oeffnen muss.
@@ -2757,9 +2762,10 @@ document.getElementById('q').addEventListener('input',e=>{state.q=e.target.value
 // jedem render() neu erzeugt werden; stopPropagation() verhindert, dass zusaetzlich der
 // Zeilen-Klick (oeffnet mit Herren-Default) mitfeuert.
 document.getElementById('list').addEventListener('click',e=>{
-  const gb=e.target.closest('.genderBtn'); if(!gb) return;
-  e.stopPropagation();
-  openDrawer(DATA.events[+gb.dataset.idx], gb.dataset.g);
+  const gb=e.target.closest('.genderBtn');
+  if(gb){ e.stopPropagation(); openDrawer(DATA.events[+gb.dataset.idx], gb.dataset.g); return; }
+  const nu=e.target.closest('.nextup-click');
+  if(nu){ e.stopPropagation(); openDrawer(DATA.events[+nu.dataset.idx], nu.dataset.gender); return; }
 });
 function wireChips(id,key,attr){
   document.getElementById(id).addEventListener('click',e=>{
