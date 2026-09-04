@@ -220,7 +220,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     header.top{flex-direction:column;align-items:stretch;}
     .hdr-actions{gap:8px;}
     .hdr-actions .stand{order:1;flex:1 0 100%;text-align:center;margin-top:2px;}
-    #seasonSel,#countrySel,#genderPrefSel,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
+    #seasonSel,#countrySel,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
     #themebtn,#refreshbtn{flex:0 0 auto;padding-left:14px;padding-right:14px;}
     .h2hpicker{flex-direction:column;align-items:stretch;}
     .h2hvs{padding-top:0;text-align:center;}
@@ -273,6 +273,9 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .vt[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);}
   .vt:hover{color:var(--ink);}
   .vt[hidden]{display:none;}
+  /* Kompakte Variante fuer den Header (Bevorzugtes Geschlecht) statt der grossen Drawer-Groesse. */
+  .genderpref{margin-top:0;padding:2px;border-radius:9px;}
+  .genderpref .vt{padding:5px 11px;font-size:12px;font-family:var(--mono);font-weight:700;}
   /* eigene Zeile unter dem Ansicht-/Geschlecht-Schalter, leicht abgesetzter Farbton */
   .phasetoggle{margin-top:8px;background:color-mix(in srgb,var(--water) 8%,var(--surface-2));
     border-color:color-mix(in srgb,var(--water) 25%,var(--line));}
@@ -671,10 +674,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     <div class="hdr-actions">
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
       <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
-      <select class="themebtn" id="genderPrefSel" title="Bevorzugtes Geschlecht">
-        <option value="M">Herren zuerst</option>
-        <option value="W">Damen zuerst</option>
-      </select>
+      <div class="vtoggle genderpref" id="genderPrefToggle" role="group" aria-label="Bevorzugtes Geschlecht" title="Bevorzugtes Geschlecht">
+        <button class="vt" data-g="M" type="button" aria-pressed="true">M</button>
+        <button class="vt" data-g="W" type="button" aria-pressed="false">W</button>
+      </div>
       <button class="themebtn h2hbtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
       <button class="themebtn h2hbtn" id="wrOpenBtn" type="button" title="Weltrangliste">🌍 Weltrangliste</button>
       <span class="stand" id="stand"></span>
@@ -828,12 +831,10 @@ function applyStaticI18n(){
   const attr=(id,name,val)=>{ const el=document.getElementById(id); if(el) el.setAttribute(name,val); };
   set('seasonSel','title',t('Saison wählen','Select season'));
   set('countrySel','title',t('Matches eines Landes hervorheben','Highlight matches for a country'));
-  set('genderPrefSel','title',t('Bevorzugtes Geschlecht','Preferred gender'));
-  const gpsel=document.getElementById('genderPrefSel');
-  if(gpsel){
-    gpsel.options[0].textContent=t('Herren zuerst','Men first');
-    gpsel.options[1].textContent=t('Damen zuerst','Women first');
-  }
+  attr('genderPrefToggle','aria-label',t('Bevorzugtes Geschlecht','Preferred gender'));
+  attr('genderPrefToggle','title',t('Bevorzugtes Geschlecht: was standardmäßig zuerst geöffnet wird','Preferred gender: which side opens by default'));
+  document.querySelector('#genderPrefToggle .vt[data-g="M"]').title=t('Herren zuerst','Men first');
+  document.querySelector('#genderPrefToggle .vt[data-g="W"]').title=t('Damen zuerst','Women first');
   set('h2hOpenBtn','title',t('Zwei Spieler:innen vergleichen','Compare two players'));
   attr('refreshbtn','title',t('Ergebnisse neu laden','Reload results'));
   attr('refreshbtn','aria-label',t('Ergebnisse neu laden','Reload results'));
@@ -989,7 +990,7 @@ function buildCountrySelect(){
   const sorted=[...codes].sort();
   if(!sorted.includes(state.country)) state.country='';
   const sel=document.getElementById('countrySel');
-  sel.innerHTML=`<option value="">🌍 ${t('Land hervorheben…','Highlight country…')}</option>`
+  sel.innerHTML=`<option value="">🌍 ${t('Land','Country')}</option>`
     + sorted.map(c=>`<option value="${c}">${flagEmoji(c)} ${c}</option>`).join('');
   sel.value=state.country;
   sel.dataset.active=state.country?'1':'0';
@@ -3089,10 +3090,12 @@ document.getElementById('countrySel').addEventListener('change',e=>{
   if(cur) reRenderKeepOpen();
 });
 buildCountrySelect();
-document.getElementById('genderPrefSel').value=genderPref;
-document.getElementById('genderPrefSel').addEventListener('change',e=>{
-  genderPref=e.target.value;
+document.querySelectorAll('#genderPrefToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.g===genderPref));
+document.getElementById('genderPrefToggle').addEventListener('click',e=>{
+  const b=e.target.closest('.vt'); if(!b) return;
+  genderPref=b.dataset.g;
   try{ localStorage.setItem('genderPref', genderPref); }catch(err){}
+  document.querySelectorAll('#genderPrefToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x===b));
   wrGender=genderPref;
   document.querySelectorAll('#wrGenderToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.g===genderPref));
   if(wrModal.classList.contains('open')) renderWorldRankingInto(wrGender);
