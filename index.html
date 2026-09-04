@@ -481,6 +481,23 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .ptbd-place{flex:0 0 auto;font-family:var(--mono);color:var(--muted);}
   .ptbd-pts{flex:0 0 auto;font-family:var(--mono);font-weight:700;min-width:34px;text-align:right;}
   .ptbd-row.counted .ptbd-pts{color:var(--green);}
+  .wrmodal{width:min(560px,92vw);}
+  .wrmodal #wrGenderToggle{margin-bottom:4px;}
+  .wr-updated{font-family:var(--mono);font-size:11px;color:var(--faint);margin:10px 0 6px;}
+  .wr-list{max-height:60vh;overflow-y:auto;margin:0 -6px;}
+  .wr-row{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:8px;cursor:pointer;
+    font-size:13px;}
+  .wr-row:hover{background:var(--surface-2);}
+  .wr-row[aria-expanded="true"]{background:var(--surface-2);}
+  .wr-row[aria-expanded="true"] .mchev{transform:rotate(90deg);}
+  .wr-rank{font-family:var(--mono);font-weight:700;color:var(--muted);flex:0 0 26px;text-align:right;}
+  .wr-team{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    display:flex;align-items:center;gap:6px;}
+  .wr-flag{width:18px;height:13px;object-fit:cover;border-radius:2px;flex:0 0 auto;}
+  .wr-fed{font-family:var(--mono);font-size:10px;color:var(--faint);}
+  .wr-pts{font-family:var(--mono);font-weight:700;flex:0 0 auto;}
+  .wr-detail{padding:2px 6px 10px 42px;}
+  .wr-detail .ptbd-row{font-size:12px;}
   .poolstat{margin-right:5px;font-size:9px;}
   .poolstat.winner{color:var(--gold);}
   .poolstat.advance{color:var(--green);}
@@ -622,6 +639,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
       <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
       <button class="themebtn h2hbtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
+      <button class="themebtn h2hbtn" id="wrOpenBtn" type="button" title="Weltrangliste">🌍 Weltrangliste</button>
       <span class="stand" id="stand"></span>
       <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden" aria-label="Ergebnisse neu laden">⟳</button>
       <button class="themebtn" id="langBtn" type="button"></button>
@@ -740,6 +758,17 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   <div id="ptBody"></div>
 </div>
 
+<div class="mscrim" id="wrscrim"></div>
+<div class="mmodal wrmodal" id="wrModal" role="dialog" aria-modal="true" aria-labelledby="wrModalTitle" aria-hidden="true">
+  <button class="mclose" id="wrClose" type="button" aria-label="Schließen">✕</button>
+  <div class="mmhead" id="wrModalTitle">🌍 Weltrangliste</div>
+  <div class="vtoggle" id="wrGenderToggle" role="group" aria-label="Geschlecht">
+    <button class="vt" data-g="M" type="button" aria-pressed="true">Herren</button>
+    <button class="vt" data-g="W" type="button" aria-pressed="false">Damen</button>
+  </div>
+  <div id="wrBody"></div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -807,6 +836,13 @@ function applyStaticI18n(){
   set('h2hSearchB','placeholder',t('Spieler:in B suchen …','Search player B …'));
   attr('ptClose','aria-label',t('Schließen','Close'));
   set('ptTitle','textContent',t('Punkte-Aufschlüsselung','Points breakdown'));
+  set('wrOpenBtn','title',t('Weltrangliste','World ranking'));
+  set('wrOpenBtn','textContent',t('🌍 Weltrangliste','🌍 World Ranking'));
+  set('wrModalTitle','textContent',t('🌍 Weltrangliste','🌍 World Ranking'));
+  attr('wrClose','aria-label',t('Schließen','Close'));
+  attr('wrGenderToggle','aria-label',t('Geschlecht','Gender'));
+  document.querySelector('#wrGenderToggle .vt[data-g="M"]').textContent=t('Herren','Men');
+  document.querySelector('#wrGenderToggle .vt[data-g="W"]').textContent=t('Damen','Women');
 }
 const TIER_COLOR = {Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
@@ -2498,6 +2534,7 @@ document.addEventListener('keydown',e=>{
   else if(mmodal.classList.contains('open')) closeMatchModal();
   else if(h2hModal.classList.contains('open')) closeH2HCompare();
   else if(ptModal.classList.contains('open')) closePointsBreakdown();
+  else if(wrModal.classList.contains('open')) closeWorldRanking();
   else closeDrawer();
 });
 document.getElementById('vtoggle').addEventListener('click',e=>{
@@ -2793,6 +2830,81 @@ function closePointsBreakdown(){ ptScrim.classList.remove('open'); ptModal.class
 ptScrim.addEventListener('click',closePointsBreakdown);
 document.getElementById('ptClose').addEventListener('click',closePointsBreakdown);
 
+// Offizielle FIVB-Weltrangliste (beste 8 Ergebnisse) — nicht ueber VIS, sondern ueber die eigene
+// (undokumentierte, aber offen per CORS zugaengliche) API von volleyballworld.com selbst, die
+// auch deren eigene Weltranglisten-Seite fuettert. Bewusst NICHT die VIS-Rangliste (GetBeach-
+// WorldTourRanking) — die hatte sich als eingefroren/veraltet herausgestellt (siehe Revert
+// weiter oben in der Historie). Diese hier wurde gegen bekannte aktuelle Platzierungen verifiziert.
+const wrScrim=document.getElementById('wrscrim'), wrModal=document.getElementById('wrModal');
+const wrCache={};
+let wrGender='M';
+async function fetchWorldRanking(gender){
+  if(wrCache[gender]) return wrCache[gender];
+  const g = gender==='W' ? 1 : 0;
+  const r = await fetch(`https://en.volleyballworld.com/api/v1/worldranking/beachvolleyball/${g}/0/100`);
+  if(!r.ok) throw new Error('World-Ranking-Anfrage fehlgeschlagen');
+  const j = await r.json();
+  wrCache[gender]=j;
+  return j;
+}
+// "isDuplicateRanking" markiert Teams, die (z.B. durch einen Partnerwechsel waehrend der
+// Saison) kein regulaeres Ranking bekommen (negativer, nicht anzeigbarer "rank"-Wert) —
+// fuer eine saubere Liste ausgeblendet, "rankToDisplay" statt "rank" fuer die Platznummer.
+function renderWorldRankingRow(team){
+  const flag = team.flagUrl ? `<img class="wr-flag" src="${team.flagUrl}" alt="" loading="lazy">` : '';
+  const comps = (team.teamCompetitions||[]).map(c=>`<div class="ptbd-row ${c.isFaded?'struck':'counted'}" title="${c.isFaded?t('Zählt nicht — außerhalb der besten 8','Does not count — outside the best 8'):t('Zählt zu den besten 8','Counts among the best 8')}">
+      <span class="ptbd-date">${(c.startDate||'').slice(0,10)}</span>
+      <span class="ptbd-city">${c.name||''}</span>
+      <span class="ptbd-place">${c.rank?`${c.rank}.`:''}</span>
+      <span class="ptbd-pts">${c.earnedPointsTeam}</span>
+    </div>`).join('');
+  return `<div class="wr-row" role="button" tabindex="0" aria-expanded="false">
+      <span class="wr-rank">${team.rankToDisplay}</span>
+      <span class="wr-team">${flag}${team.name}<span class="wr-fed">${team.federationCode||''}</span></span>
+      <span class="wr-pts">${team.points}</span>
+      <span class="mchev">›</span>
+    </div>
+    <div class="wr-detail" hidden>${comps || `<p class="h2hNote">${t('Keine Turnierdaten verfügbar.','No tournament data available.')}</p>`}</div>`;
+}
+function renderWorldRanking(data){
+  const teams=(data.teams||[]).filter(x=>!x.isDuplicateRanking);
+  const updated=`<div class="wr-updated">${t('Stand','As of')}: ${data.date||''}</div>`;
+  if(!teams.length) return updated+`<p class="h2hNote">${t('Keine Daten verfügbar.','No data available.')}</p>`;
+  return updated+`<div class="wr-list">${teams.map(renderWorldRankingRow).join('')}</div>`;
+}
+async function renderWorldRankingInto(gender){
+  const body=document.getElementById('wrBody');
+  body.innerHTML=`<p class="h2hNote">${t('Lädt Weltrangliste …','Loading world ranking …')}</p>`;
+  try{
+    const data=await fetchWorldRanking(gender);
+    if(wrGender===gender) body.innerHTML=renderWorldRanking(data);
+  }catch(e){
+    if(wrGender===gender) body.innerHTML=`<p class="h2hNote">${t('Weltrangliste konnte nicht geladen werden.','Could not load the world ranking.')}</p>`;
+  }
+}
+function openWorldRanking(){
+  wrScrim.classList.add('open'); wrModal.classList.add('open'); wrModal.setAttribute('aria-hidden','false');
+  document.getElementById('wrClose').focus();
+  renderWorldRankingInto(wrGender);
+}
+function closeWorldRanking(){ wrScrim.classList.remove('open'); wrModal.classList.remove('open'); wrModal.setAttribute('aria-hidden','true'); }
+document.getElementById('wrOpenBtn').addEventListener('click', openWorldRanking);
+wrScrim.addEventListener('click',closeWorldRanking);
+document.getElementById('wrClose').addEventListener('click',closeWorldRanking);
+document.getElementById('wrGenderToggle').addEventListener('click',e=>{
+  const b=e.target.closest('.vt'); if(!b) return;
+  wrGender=b.dataset.g;
+  document.querySelectorAll('#wrGenderToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  renderWorldRankingInto(wrGender);
+});
+document.getElementById('wrBody').addEventListener('click',e=>{
+  const row=e.target.closest('.wr-row'); if(!row) return;
+  const det=row.nextElementSibling; if(!det || !det.classList.contains('wr-detail')) return;
+  const show=det.hasAttribute('hidden');
+  det.toggleAttribute('hidden', !show);
+  row.setAttribute('aria-expanded', show);
+});
+
 document.getElementById('dBody').addEventListener('click',e=>{
   const box=e.target.closest('.bx.clickable'); if(box){ openMatchModal(box.dataset.n); return; }
   const pts=e.target.closest('.pts-click'); if(pts){ openPointsBreakdown(pts.dataset.p1no,pts.dataset.p2no,pts.dataset.team); return; }
@@ -2861,7 +2973,7 @@ document.getElementById('themebtn').addEventListener('click',()=>{
 document.getElementById('langBtn').addEventListener('click',()=>{
   lang = lang==='de' ? 'en' : 'de';
   try{ localStorage.setItem('lang', lang); }catch(e){}
-  closeDrawer(); closeMatchModal(); closePlayerCard(); closeH2HCompare(); closePointsBreakdown();
+  closeDrawer(); closeMatchModal(); closePlayerCard(); closeH2HCompare(); closePointsBreakdown(); closeWorldRanking();
   applyStaticI18n();
   buildTierChips();
   buildCountrySelect();
