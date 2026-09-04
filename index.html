@@ -1843,8 +1843,24 @@ function vwMatchUrl(ev, gn){
   const citySlug=`${slugify(ev.city)}-${fedCode.toLowerCase()}`;
   return `https://en.volleyballworld.com/beachvolleyball/competitions/beach-pro-tour/${year}/${tierSlug}/${citySlug}/schedule/${gn}/_libraries/_latest-photos`;
 }
+// Ohne Cache fuehrte jedes erneute Oeffnen desselben Matches zu einem komplett neuen Fetch-
+// Versuch gegen die undokumentierte volleyballworld.com-Schnittstelle — bei einem transienten
+// Netzwerk-/Rate-Limit-Fehler (vom catch weiter unten stillschweigend geschluckt) verschwanden
+// dadurch Fotos, die beim vorherigen Oeffnen noch da waren. Einmal gefundene Fotos bleiben jetzt
+// fuer die Sitzung gecacht; nur ein negatives Ergebnis wird NICHT gecacht, damit waehrend eines
+// laufenden Turniers spaeter nachgereichte Fotos beim naechsten Oeffnen noch auftauchen koennen.
+const matchPhotosCache={};
+function renderMatchPhotos(photos, containerEl){
+  const items=photos.map((p,i)=>
+    `<button class="mdphoto" type="button" data-idx="${i}" aria-label="${p.cap.replace(/"/g,'&quot;')}">
+      <img loading="lazy" src="${p.full}" alt=""></button>`).join('');
+  containerEl.innerHTML=`<div class="mdphotos-lab">${t('Fotos','Photos')} <span class="mdphotos-src">· volleyballworld.com</span></div>
+    <div class="mdphotos-grid">${items}</div>`;
+  containerEl._photos=photos;
+}
 async function loadMatchPhotos(m, containerEl){
   if(!cur || !cur.ev || !played(m) || !m.gn) return;
+  if(matchPhotosCache[m.gn]){ renderMatchPhotos(matchPhotosCache[m.gn], containerEl); return; }
   const url=vwMatchUrl(cur.ev, m.gn);
   if(!url) return;
   try{
@@ -1853,20 +1869,17 @@ async function loadMatchPhotos(m, containerEl){
     const html=await r.text();
     const doc=new DOMParser().parseFromString(html,'text/html');
     const cards=[...doc.querySelectorAll('a.fm-card-wrap.-photo')].slice(0,6);
-    if(!cards.length || !containerEl.isConnected) return;
+    if(!cards.length) return;
     // Cloudinary generiert eigene Groessenvarianten nicht automatisch (getestet: 404) — daher
     // das Originalbild direkt einbetten, nicht selbst eine Thumbnail-Transformation bauen.
     const photos=cards.map(a=>({
       full:a.getAttribute('href')||'',
       cap:a.getAttribute('data-caption')||'',
     }));
-    const items=photos.map((p,i)=>
-      `<button class="mdphoto" type="button" data-idx="${i}" aria-label="${p.cap.replace(/"/g,'&quot;')}">
-        <img loading="lazy" src="${p.full}" alt=""></button>`).join('');
-    containerEl.innerHTML=`<div class="mdphotos-lab">${t('Fotos','Photos')} <span class="mdphotos-src">· volleyballworld.com</span></div>
-      <div class="mdphotos-grid">${items}</div>`;
-    containerEl._photos=photos;
-  }catch(e){ /* Slug passt vermutlich nicht — Sektion bleibt leer, kein Fehler sichtbar */ }
+    matchPhotosCache[m.gn]=photos;
+    if(!containerEl.isConnected) return;
+    renderMatchPhotos(photos, containerEl);
+  }catch(e){ /* Slug passt vermutlich nicht, oder Netzwerkfehler — naechster Aufruf versucht es erneut */ }
 }
 // Foto-Lightbox: aus jeder .mdphotos-Sektion heraus durch alle ihre Fotos blaettern.
 let photoLbPhotos=[], photoLbIdx=0;
@@ -2513,8 +2526,11 @@ function openPlayerCard(no){
   // Offizielles FIVB-Portraitfoto, sofern vorhanden — GetImage.asmx liefert kein CORS, aber
   // ein <img> braucht das nicht; onerror blendet das Element aus, falls FIVB fuer diese
   // Spieler:in kein Foto hinterlegt hat, statt ein kaputtes Bild-Icon zu zeigen.
+  // Width=112 laesst FIVB serverseitig auf WebP verkleinern (empirisch getestet: Original oft
+  // >1MB fuers volle Portraet, mit Width~4-6KB) - ohne den Parameter dauert das Laden bei einem
+  // 56px-Kreis unnoetig lang.
   document.getElementById('pmTitle').innerHTML = `${t('Spielerprofil','Player profile')}${p?`<div class="pcname">
-    <img class="pcphoto" src="https://www.fivb.org/Vis2009/Images/GetImage.asmx?No=${no}&amp;Type=Player" alt="">
+    <img class="pcphoto" src="https://www.fivb.org/Vis2009/Images/GetImage.asmx?No=${no}&amp;Type=Player&amp;Width=112" alt="">
     <div><div>${p.fn||''} <b>${p.ln||''}</b></div>${fed(p.fed)}</div></div>`:''}`;
   const photoEl=document.querySelector('#pmTitle .pcphoto');
   if(photoEl) photoEl.onerror=()=>photoEl.remove();
