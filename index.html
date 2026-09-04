@@ -138,6 +138,9 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   /* Trefferflaeche ueber die sichtbare Buttongroesse hinaus vergroessern (v.a. fuer Mobile-Tipp-
      genauigkeit), ohne den Button optisch groesser wirken zu lassen. */
   .genderBtn::before{content:'';position:absolute;top:-7px;bottom:-7px;left:-4px;right:-4px;}
+  /* W steht aussen (kein Nachbar rechts, dem man in die Flaeche greifen koennte) — dort etwas
+     grosszuegiger als bei M, wo links weiterhin Platz fuer den Nachbarbutton bleiben muss. */
+  .genderBtn[data-g="W"]::before{top:-9px;bottom:-9px;right:-9px;}
   .nextup{grid-column:1/-1;margin-top:6px;padding-top:7px;border-top:1px dashed var(--line);
     display:flex;flex-direction:column;gap:3px;}
   .nextlab{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;
@@ -378,7 +381,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .pcname{font-size:19px;letter-spacing:-.01em;color:var(--ink);text-transform:none;
     display:flex;align-items:center;gap:12px;}
   .pcname b{font-weight:800;}
-  .pcphoto{width:56px;height:56px;border-radius:50%;object-fit:cover;object-position:top center;
+  .pcphoto{width:68px;height:68px;border-radius:50%;object-fit:cover;object-position:top center;
     background:var(--surface-2);flex:0 0 auto;border:1px solid var(--line);}
   .lastmatches{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);}
   .lastm{display:grid;grid-template-columns:30px 80px 1fr;gap:8px;align-items:center;
@@ -974,11 +977,14 @@ function nextUpHtml(e){
   const offset=venueOffsetMinutes(e.country, e.start);
   const rows=next.map(({m,g})=>`<div class="nextrow${isCountryHl(m.ca,m.cb)?' hl-country':''}"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
       <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span></div>`).join('');
-  // Klick irgendwo im Block soll direkt zum passenden Geschlecht springen, statt immer zum
-  // Herren-Default — nur eindeutig, wenn ausschliesslich ein Geschlecht in "Als Naechstes" steht.
+  // Klick irgendwo im Block soll direkt zum passenden Geschlecht UND zur passenden Phase
+  // springen, statt immer zum Herren/aktuelle-Phase-Default — Geschlecht nur eindeutig, wenn
+  // ausschliesslich eines in "Als Naechstes" steht; die Phase kommt vom allerersten (naechsten)
+  // Match der Liste, da die Anzeige dort eh chronologisch sortiert ist.
   const gset=new Set(next.map(({g})=>g));
   const gender=gset.size===1 ? [...gset][0] : 'M';
-  return `<div class="nextup nextup-click" data-idx="${e._idx}" data-gender="${gender}"><div class="nextlab">${t('Als Nächstes','Up next')}</div>${rows}</div>`;
+  const phase=toPhase(macroOf(next[0].m.rc,next[0].m.rn));
+  return `<div class="nextup nextup-click" data-idx="${e._idx}" data-gender="${gender}" data-phase="${phase}"><div class="nextlab">${t('Als Nächstes','Up next')}</div>${rows}</div>`;
 }
 // Matches, die JETZT laufen (nicht nur "Turnier im Zeitraum live") — Zwischenstand direkt
 // in der Hauptliste, ohne dass man dafuer den Drawer oeffnen muss.
@@ -1728,7 +1734,7 @@ function reRenderKeepOpen(){
     if(row) toggleMatch(row);
   });
 }
-function openDrawer(ev,gender){
+function openDrawer(ev,gender,phase){
   // Kommende Turniere sind noch nicht in resultNos (keine gecachten Ergebnisse), aber
   // die Setzliste laesst sich per Live-Fetch trotzdem laden — daher hier zulassen.
   const mNo = ev.M && (resultNos.has(ev.M.no) || ev.status==='upcoming') ? ev.M.no : null;
@@ -1739,7 +1745,10 @@ function openDrawer(ev,gender){
   const byN={}; matches.forEach(m=>byN[m.n]=m);
   cur={no,city:ev.city,tier:ev.tier,org:ev.org,matches,byN,ev,gender:g,mNo,wNo};
   if(ev.status==='upcoming') drawerView='seeds';
-  listPhase=currentPhase(matches);
+  // Ein explizit uebergebenes phase (z.B. Klick auf "Als Naechstes") soll auch wirklich in der
+  // Listenansicht landen, sonst waere die Phase unsichtbar, falls zuvor Baum/Teams/Ranking offen war.
+  if(phase) drawerView='list';
+  listPhase = phase || currentPhase(matches);
 
   updateDrawerContent();
   setView(drawerView);
@@ -2120,11 +2129,11 @@ function availablePhases(matches){
     quali: macros.has('quali'),
   };
 }
+const toPhase = macro => macro==='quali' ? 'quali' : macro==='group' ? 'pool' : 'ko';
 // Bei einem Live-Turnier automatisch die Phase zeigen, in der gerade gespielt wird; sonst die
 // am weitesten fortgeschrittene Phase mit mindestens einem Ergebnis; ohne jedes Ergebnis die
 // fruehste Phase mit ueberhaupt angesetzten Matches.
 function currentPhase(matches){
-  const toPhase = macro => macro==='quali' ? 'quali' : macro==='group' ? 'pool' : 'ko';
   const live=matches.find(isLive);
   if(live) return toPhase(macroOf(live.rc,live.rn));
   for(const macro of ['final','inter','group','quali']){
@@ -2526,11 +2535,11 @@ function openPlayerCard(no){
   // Offizielles FIVB-Portraitfoto, sofern vorhanden — GetImage.asmx liefert kein CORS, aber
   // ein <img> braucht das nicht; onerror blendet das Element aus, falls FIVB fuer diese
   // Spieler:in kein Foto hinterlegt hat, statt ein kaputtes Bild-Icon zu zeigen.
-  // Width=112 laesst FIVB serverseitig auf WebP verkleinern (empirisch getestet: Original oft
+  // Width=136 laesst FIVB serverseitig auf WebP verkleinern (empirisch getestet: Original oft
   // >1MB fuers volle Portraet, mit Width~4-6KB) - ohne den Parameter dauert das Laden bei einem
-  // 56px-Kreis unnoetig lang.
+  // 68px-Kreis unnoetig lang. 136 statt 68 fuer scharfe Darstellung auf Retina-Displays.
   document.getElementById('pmTitle').innerHTML = `${t('Spielerprofil','Player profile')}${p?`<div class="pcname">
-    <img class="pcphoto" src="https://www.fivb.org/Vis2009/Images/GetImage.asmx?No=${no}&amp;Type=Player&amp;Width=112" alt="">
+    <img class="pcphoto" src="https://www.fivb.org/Vis2009/Images/GetImage.asmx?No=${no}&amp;Type=Player&amp;Width=136" alt="">
     <div><div>${p.fn||''} <b>${p.ln||''}</b></div>${fed(p.fed)}</div></div>`:''}`;
   const photoEl=document.querySelector('#pmTitle .pcphoto');
   if(photoEl) photoEl.onerror=()=>photoEl.remove();
@@ -2781,7 +2790,7 @@ document.getElementById('list').addEventListener('click',e=>{
   const gb=e.target.closest('.genderBtn');
   if(gb){ e.stopPropagation(); openDrawer(DATA.events[+gb.dataset.idx], gb.dataset.g); return; }
   const nu=e.target.closest('.nextup-click');
-  if(nu){ e.stopPropagation(); openDrawer(DATA.events[+nu.dataset.idx], nu.dataset.gender); return; }
+  if(nu){ e.stopPropagation(); openDrawer(DATA.events[+nu.dataset.idx], nu.dataset.gender, nu.dataset.phase); return; }
 });
 function wireChips(id,key,attr){
   document.getElementById(id).addEventListener('click',e=>{
