@@ -464,7 +464,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .standings td{padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
   .standings tr:last-child td{border-bottom:none;}
   .standings td.pos{color:var(--faint);font-family:var(--mono);width:16px;}
-  .standings td.nm{font-weight:600;}
+  .standings td.nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;}
   .standings td.entry{color:var(--faint);font-size:11.5px;}
   .standings td.seedres.champ{color:var(--gold);font-weight:700;}
   .standings td.seedres.bronze{color:var(--gold);font-weight:600;}
@@ -500,7 +500,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     display:flex;align-items:center;gap:6px;}
   .wr-flag{width:18px;height:13px;object-fit:cover;border-radius:2px;flex:0 0 auto;}
   .wr-fed{font-family:var(--mono);font-size:10px;color:var(--faint);}
-  .wr-pts{font-family:var(--mono);font-weight:700;flex:0 0 auto;}
+  .wr-pts-wrap{display:flex;flex-direction:column;align-items:flex-end;flex:0 0 auto;}
+  .wr-pts{font-family:var(--mono);font-weight:700;}
+  .wr-played{font-family:var(--mono);font-size:9px;color:var(--faint);white-space:nowrap;}
+  .wr-rulenote{margin:8px 0 0;}
   .wr-detail{padding:2px 6px 10px 42px;}
   .wr-detail .ptbd-row{font-size:12px;}
   .poolstat{margin-right:5px;font-size:9px;}
@@ -2355,14 +2358,18 @@ function renderEntryTiers({rows,deadline}){
   // Setzungspunkte, da VIS selbst kein eigenes "SeedPoints"-Feld liefert.
   const pastDeadline = deadline && new Date()>=new Date(deadline);
   const ptsLabel = pastDeadline ? t('Punkte (Setzung)','Points (seeding)') : t('Punkte (Einstieg)','Points (entry)');
+  // Spieler:innen als eigene, anklickbare Spalten statt eines kombinierten "P1/P2"-Textblocks —
+  // uebersichtlicher (naeher an dem, was 12ndr.at hier zeigt) und verlinkt direkt ins Profil.
+  const playerLink = (no,name) => no && name ? `<span class="plink" data-p="${no}" role="button" tabindex="0">${name}</span>` : (name||'–');
   const sections = ENTRY_SECTIONS.map(([key,label])=>{
     const items=rows.filter(r=>r.tier===key);
     if(!items.length) return '';
-    const trs=items.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${r.p1}/${r.p2} ${fed(r.fed)}
-      ${r.fromQuali?`<span class="qbadge" title="${t('Aus der Qualifikation nachgerückt','Advanced from qualification')}">Q</span>`:''}</td>
+    const trs=items.map((r,i)=>`<tr><td class="pos">${i+1}</td>
+      <td class="nm">${fed(r.fed)}${playerLink(r.p1no,r.p1)}${r.fromQuali?`<span class="qbadge" title="${t('Aus der Qualifikation nachgerückt','Advanced from qualification')}">Q</span>`:''}</td>
+      <td class="nm">${playerLink(r.p2no,r.p2)}</td>
       <td class="n">${r.points!=null?r.points:'–'}</td></tr>`).join('');
     return `<div class="entrysection"><div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
-      <table class="standings"><thead><tr><th class="n">#</th><th>Team</th><th class="n">${ptsLabel}</th></tr></thead>
+      <table class="standings"><thead><tr><th class="n">#</th><th>${t('Spieler:in 1','Player 1')}</th><th>${t('Spieler:in 2','Player 2')}</th><th class="n">${ptsLabel}</th></tr></thead>
       <tbody>${trs}</tbody></table></div>`;
   }).join('');
   return sections + `<p class="bkt-note">${t(
@@ -2865,16 +2872,17 @@ function renderWorldRankingRow(team){
   return `<div class="wr-row" role="button" tabindex="0" aria-expanded="false">
       <span class="wr-rank">${team.rankToDisplay}</span>
       <span class="wr-team">${flag}${team.name}<span class="wr-fed">${team.federationCode||''}</span></span>
-      <span class="wr-pts">${team.points}</span>
+      <span class="wr-pts-wrap"><span class="wr-pts">${team.points}</span><span class="wr-played">${team.tournamentsPlayed||0} ${t('Turniere','events')}</span></span>
       <span class="mchev">›</span>
     </div>
     <div class="wr-detail" hidden>${comps || `<p class="h2hNote">${t('Keine Turnierdaten verfügbar.','No tournament data available.')}</p>`}</div>`;
 }
 function renderWorldRanking(data){
   const teams=(data.teams||[]).filter(x=>!x.isDuplicateRanking);
+  const note=`<p class="bkt-note wr-rulenote">${t('Es zählen die besten 8 Ergebnisse der letzten 12 Monate.','The best 8 results from the last 12 months count.')}</p>`;
   const updated=`<div class="wr-updated">${t('Stand','As of')}: ${data.date||''}</div>`;
-  if(!teams.length) return updated+`<p class="h2hNote">${t('Keine Daten verfügbar.','No data available.')}</p>`;
-  return updated+`<div class="wr-list">${teams.map(renderWorldRankingRow).join('')}</div>`;
+  if(!teams.length) return note+updated+`<p class="h2hNote">${t('Keine Daten verfügbar.','No data available.')}</p>`;
+  return note+updated+`<div class="wr-list">${teams.map(renderWorldRankingRow).join('')}</div>`;
 }
 async function renderWorldRankingInto(gender){
   const body=document.getElementById('wrBody');
