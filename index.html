@@ -2472,8 +2472,11 @@ function renderList(phase){
     if(!qualiCodes.length) return `<div class="bkt-note">${t('Für dieses Turnier gibt es keine Qualifikation.','This tournament has no qualification.')}</div>`;
     return qualiCodes.map(c=>renderRound(c.rc,c.rn)).join('');
   }
-  // phase==='ko' (Finalphase + Zwischenrunde) — Standardansicht
-  const elimCodes = codes.filter(c=>c.macro==='final'||c.macro==='inter');
+  // phase==='ko' (Finalphase + Zwischenrunde) — Standardansicht. codes ist sonst ueberall
+  // "Finale ganz oben" sortiert (siehe KO_RANK-Kommentar) — in der KO-Liste aber bewusst
+  // umgedreht, damit die Runden in tatsaechlicher Spielreihenfolge erscheinen und das Finale
+  // unten steht statt oben.
+  const elimCodes = codes.filter(c=>c.macro==='final'||c.macro==='inter').reverse();
   if(!elimCodes.length) return `<div class="bkt-note">${t('Für dieses Turnier liegt noch keine Finalrunden-Ansetzung vor.','No final-round schedule yet for this tournament.')}</div>`;
   const elimHasRealTeams = elimCodes.some(({rc})=>rmOf(rc).some(m=>m.a && m.b));
   const collapseElim = !elimHasRealTeams && codes.some(c=>c.macro==='group'||c.macro==='quali');
