@@ -626,6 +626,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .mdmeta .r{display:flex;gap:8px;}
   .mdmeta .k{color:var(--faint);flex:0 0 82px;}
   .mdmeta .v{color:var(--ink);}
+  .mdmeta .v .faint{color:var(--faint);}
   .mdetail .mdmeta{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
   .mdphotos:empty{display:none;}
   .mdphotos{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
@@ -1387,8 +1388,37 @@ function buildPlayerCard(no){
     p.lg?[t('Sprachen','Languages'), p.lg]:null,
     p.yb?[t('Beach seit','On beach since'), p.yb]:null,
     p.tm?['Team', p.tm]:null,
-  ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  ].filter(Boolean).map(([k,v])=>`<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')
+    + `<div class="r" id="pmWRRow" hidden><span class="k">${t('Weltrangliste','World ranking')}</span><span class="v" id="pmWRVal"></span></div>`;
   return `<div class="mdmeta">${rows}</div><div id="pmLast">${renderLastMatches(no)}</div>`;
+}
+// Aktuelle Weltranglisten-Position einer Spielerin/eines Spielers: die volleyballworld.com-API
+// liefert nur Team-Eintraege ohne FIVB-Spielernummer (nur player1Name/player2Name als Text) —
+// daher Zuordnung ueber Nachname, bei Mehrdeutigkeit zusaetzlich per Verbandscode eingegrenzt.
+// Historisch beste Position ist darueber NICHT ermittelbar, da die API nur den aktuellen Stand
+// liefert (keine Vergangenheitsabfrage) — deshalb bewusst nicht gebaut.
+function findWorldRankingEntry(teams, ln, fed){
+  const norm = s => (s||'').toLowerCase().trim();
+  const target = norm(ln);
+  if(!target) return null;
+  const hits = teams.filter(tm=>{
+    const n1=norm(tm.player1Name).split(',')[0].trim(), n2=norm(tm.player2Name).split(',')[0].trim();
+    return n1===target || n2===target;
+  });
+  if(hits.length<=1) return hits[0]||null;
+  return hits.find(tm=>tm.federationCode===fed) || hits[0];
+}
+async function currentWorldRankingFor(no){
+  const p=DATA.players[no]; if(!p||!p.ln) return null;
+  for(const g of ['M','W']){
+    try{
+      const data=await fetchWorldRanking(g);
+      const teams=(data.teams||[]).filter(x=>!x.isDuplicateRanking);
+      const hit=findWorldRankingEntry(teams, p.ln, p.fed);
+      if(hit) return {rank:hit.rankToDisplay, points:hit.points};
+    }catch(e){ /* Weltrangliste evtl. nicht erreichbar — Profil bleibt trotzdem nutzbar */ }
+  }
+  return null;
 }
 // Offizielle FIVB-Punktetabelle pro Athlet (Sport Operations Manual, Abschnitt 7 "Ranking
 // Points Breakdown Per Athlete"). Nur die Stufen, die laut Regelwerk fuer Entry/Seeding
@@ -1489,25 +1519,28 @@ function personalTournamentResults(playerNo, limit=5){
         const pa=(m.pa||[]).map(String), pb=(m.pb||[]).map(String);
         if(!pa.includes(playerNo) && !pb.includes(playerNo)) continue;
         const key=`${year}|${tno}`;
-        if(!byTournament.has(key))
-          byTournament.set(key,{year:+year,tno,teamName:pa.includes(playerNo)?m.a:m.b});
+        if(!byTournament.has(key)){
+          const onSideA=pa.includes(playerNo), mates=onSideA?pa:pb;
+          byTournament.set(key,{year:+year,tno,teamName:onSideA?m.a:m.b,partnerNo:mates.find(x=>x!==playerNo)||null});
+        }
       }
     }
   }
   const rows=[];
-  for(const {year,tno,teamName} of byTournament.values()){
+  for(const {year,tno,teamName,partnerNo} of byTournament.values()){
     const sd=seasonCache[year]; if(!sd) continue;
     const ev=eventForTournament(sd,tno); if(!ev) continue;
     const matches=sd.results[tno]; if(!matches) continue;
     const row=derivedRanking(matches).find(t=>t.name===teamName); if(!row) continue;
     const city=((sd.venues||{})[tno]||{}).city||ev.city||'';
+    const partner=partnerNo && sd.players && sd.players[partnerNo] ? sd.players[partnerNo].ln : null;
     // entscheidendes Match dieses Turniers (Finale bei Champion, sonst das Ausscheiden) fuer
     // Gegner+Ergebnis aus Sicht des gesuchten Spielers.
     const lm=row.lastMatch, lmOpp=lm?(lm.side==='a'?lm.m.b:lm.m.a):null,
       lmOppFed=lm?(lm.side==='a'?lm.m.cb:lm.m.ca):null,
       lmScore=lm?(lm.side==='a'?`${lm.m.sa}:${lm.m.sb}`:`${lm.m.sb}:${lm.m.sa}`):null,
       lmRound=lm?lm.m.rc:null;
-    rows.push({tno,season:year,date:ev.start,city,tier:ev.tier,place:row.place,cls:row.cls,result:row.result,lmRound,lmOpp,lmOppFed,lmScore});
+    rows.push({tno,season:year,date:ev.start,city,tier:ev.tier,place:row.place,cls:row.cls,result:row.result,lmRound,lmOpp,lmOppFed,lmScore,partner});
   }
   rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return rows.slice(0,limit);
@@ -1516,11 +1549,11 @@ function renderLastMatches(playerNo){
   if(!allSeasonsLoaded) return `<p class="h2hNote">${t('Lädt Spielverlauf …','Loading match history …')}</p>`;
   const res=personalTournamentResults(playerNo,5);
   if(!res.length) return '';
-  const rows=res.map(({tno,season,date,city,tier,place,cls,result,lmRound,lmOpp,lmOppFed,lmScore})=>{
+  const rows=res.map(({tno,season,date,city,tier,place,cls,result,lmRound,lmOpp,lmOppFed,lmScore,partner})=>{
     // Bei Ausscheiden ist die Kurzform (Runden-Code + Platz) griffiger als der volle Text
     // "Aus: Viertelfinale" — Champion/Bronze/aktiv behalten ihre eigene Bezeichnung.
     const roundText = cls==='out' && lmRound ? `${lmRound} · ${place}. ${t('Platz','place')}` : result;
-    const place2=`${tier?tier+' · ':''}${city}`;
+    const place2=`${tier?tier+' · ':''}${city}${partner?` · ${t('mit','with')} ${partner}`:''}`;
     const detail = lmOpp ? `${t('Letztes Spiel','Last match')}: vs ${teamFlag(lmOppFed)}${lmOpp}${lmScore?` ${lmScore}`:''} · ${place2}` : place2;
     return `<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
         aria-label="${t(`Ergebnis ${city} öffnen`,`Open result for ${city}`)}">
@@ -2731,6 +2764,7 @@ document.getElementById('mmClose').addEventListener('click',closeMatchModal);
 
 // Spielerprofil-Modal
 const pscrim=document.getElementById('pscrim'), pmodal=document.getElementById('pmodal');
+let pmOpenNo=null;
 function openPlayerCard(no){
   const p=DATA.players[no];
   // Offizielles FIVB-Portraitfoto, sofern vorhanden — GetImage.asmx liefert kein CORS, aber
@@ -2747,6 +2781,14 @@ function openPlayerCard(no){
   document.getElementById('pmBody').innerHTML = buildPlayerCard(no);
   pscrim.classList.add('open'); pmodal.classList.add('open'); pmodal.setAttribute('aria-hidden','false');
   document.getElementById('pmClose').focus();
+  pmOpenNo=no;
+  currentWorldRankingFor(no).then(wr=>{
+    if(!wr || pmOpenNo!==no || !pmodal.classList.contains('open')) return;
+    const row=document.getElementById('pmWRRow'), val=document.getElementById('pmWRVal');
+    if(!row||!val) return;
+    val.innerHTML = `#${wr.rank} <span class="faint">(${wr.points} ${t('Pkt.','pts')})</span>`;
+    row.hidden=false;
+  });
   if(!allSeasonsLoaded){
     ensureAllSeasonsLoaded().then(()=>{
       if(pmodal.classList.contains('open')){
