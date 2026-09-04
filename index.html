@@ -2858,7 +2858,14 @@ function personalEncounters(noA,noB){
         const aSide=sideOf(noA), bSide=sideOf(noB);
         if(!aSide || !bSide || aSide===bSide) continue;  // beide dabei, aber auf verschiedenen Seiten
         const ev=eventForTournament(sd,tno);
-        out.push({m, city:((sd.venues||{})[tno]||{}).city||'', tier: ev?ev.tier:'', aSide});
+        // Manche Matches liefern kein Venue/City von VIS — dann den Turniernamen (die im
+        // Event hinterlegte Stadt, die auch sonst ueberall als Turnier-Label dient) als
+        // Ersatz nehmen, aber auf 15 Zeichen kappen, da dort auch mal ein laengerer Name
+        // stehen kann (z.B. wenn die Stadt selbst nicht aus dem VIS-Namen extrahierbar war).
+        const venueCity=((sd.venues||{})[tno]||{}).city;
+        let city=venueCity || (ev?ev.city:'') || '';
+        if(!venueCity && city.length>15) city=city.slice(0,15)+'…';
+        out.push({m, city, tier: ev?ev.tier:'', aSide});
       }
     }
   }
