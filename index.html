@@ -220,7 +220,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     header.top{flex-direction:column;align-items:stretch;}
     .hdr-actions{gap:8px;}
     .hdr-actions .stand{order:1;flex:1 0 100%;text-align:center;margin-top:2px;}
-    #seasonSel,#countrySel,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
+    #seasonSel,#countrySel,#genderPrefSel,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
     #themebtn,#refreshbtn{flex:0 0 auto;padding-left:14px;padding-right:14px;}
     .h2hpicker{flex-direction:column;align-items:stretch;}
     .h2hvs{padding-top:0;text-align:center;}
@@ -671,6 +671,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     <div class="hdr-actions">
       <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
       <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
+      <select class="themebtn" id="genderPrefSel" title="Bevorzugtes Geschlecht">
+        <option value="M">Herren zuerst</option>
+        <option value="W">Damen zuerst</option>
+      </select>
       <button class="themebtn h2hbtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
       <button class="themebtn h2hbtn" id="wrOpenBtn" type="button" title="Weltrangliste">🌍 Weltrangliste</button>
       <span class="stand" id="stand"></span>
@@ -824,6 +828,12 @@ function applyStaticI18n(){
   const attr=(id,name,val)=>{ const el=document.getElementById(id); if(el) el.setAttribute(name,val); };
   set('seasonSel','title',t('Saison wählen','Select season'));
   set('countrySel','title',t('Matches eines Landes hervorheben','Highlight matches for a country'));
+  set('genderPrefSel','title',t('Bevorzugtes Geschlecht','Preferred gender'));
+  const gpsel=document.getElementById('genderPrefSel');
+  if(gpsel){
+    gpsel.options[0].textContent=t('Herren zuerst','Men first');
+    gpsel.options[1].textContent=t('Damen zuerst','Women first');
+  }
   set('h2hOpenBtn','title',t('Zwei Spieler:innen vergleichen','Compare two players'));
   attr('refreshbtn','title',t('Ergebnisse neu laden','Reload results'));
   attr('refreshbtn','aria-label',t('Ergebnisse neu laden','Reload results'));
@@ -876,6 +886,7 @@ function applyStaticI18n(){
   attr('wrGenderToggle','aria-label',t('Geschlecht','Gender'));
   document.querySelector('#wrGenderToggle .vt[data-g="M"]').textContent=t('Herren','Men');
   document.querySelector('#wrGenderToggle .vt[data-g="W"]').textContent=t('Damen','Women');
+  document.querySelectorAll('#wrGenderToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.g===genderPref));
 }
 const TIER_COLOR = {Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
@@ -906,6 +917,11 @@ function eventResultNo(ev){
 // State
 let savedCountryPref=''; try{ savedCountryPref=localStorage.getItem('countryPref')||''; }catch(e){}
 const state={q:'',org:'FIVB',tiers:{},country:savedCountryPref};
+// Bevorzugtes Geschlecht: bestimmt, welche Seite standardmaessig geoeffnet wird, wenn beide
+// zur Auswahl stehen (Turnierzeile anklicken ohne expliziten M/W-Button, Weltrangliste) — nicht
+// zu verwechseln mit state.country (Team-Hervorhebung) oder den expliziten M/W-Buttons/-Tabs,
+// die weiterhin gezielt das jeweils andere Geschlecht oeffnen koennen.
+let genderPref='M'; try{ genderPref=localStorage.getItem('genderPref')||'M'; }catch(e){}
 // Matches mit Beteiligung eines Teams aus dem bevorzugten Land hervorheben (Listen- und
 // Turnier-Widgets) — reine Optik, kein Filter, daher unabhaengig von allen anderen Kriterien.
 const isCountryHl = (ca,cb) => !!state.country && (ca===state.country || cb===state.country);
@@ -1070,7 +1086,7 @@ function nextUpHtml(e){
   // ausschliesslich eines in "Als Naechstes" steht; die Phase kommt vom allerersten (naechsten)
   // Match der Liste, da die Anzeige dort eh chronologisch sortiert ist.
   const gset=new Set(next.map(({g})=>g));
-  const gender=gset.size===1 ? [...gset][0] : 'M';
+  const gender=gset.size===1 ? [...gset][0] : genderPref;
   const phase=toPhase(macroOf(next[0].m.rc,next[0].m.rn));
   return `<div class="nextup nextup-click" data-idx="${e._idx}" data-gender="${gender}" data-phase="${phase}"><div class="nextlab">${t('Als Nächstes','Up next')}</div>${rows}</div>`;
 }
@@ -1831,7 +1847,11 @@ function openDrawer(ev,gender,phase){
   // die Setzliste laesst sich per Live-Fetch trotzdem laden — daher hier zulassen.
   const mNo = ev.M && (resultNos.has(ev.M.no) || ev.status==='upcoming') ? ev.M.no : null;
   const wNo = ev.W && (resultNos.has(ev.W.no) || ev.status==='upcoming') ? ev.W.no : null;
-  const g = (gender==='M'&&mNo) || (gender==='W'&&wNo) ? gender : (mNo ? 'M' : 'W');
+  // Explizit angefordertes Geschlecht (M/W-Button, "Als Naechstes"-Klick) hat Vorrang; ohne das
+  // (normaler Zeilenklick) entscheidet das bevorzugte Geschlecht aus den Einstellungen, sofern
+  // fuer dieses Turnier ueberhaupt vorhanden — sonst faellt es auf das tatsaechlich vorhandene.
+  const g = (gender==='M'&&mNo) || (gender==='W'&&wNo) ? gender
+    : (genderPref==='W' && wNo) ? 'W' : (mNo ? 'M' : 'W');
   const no = g==='M' ? mNo : wNo;
   const matches=DATA.results[no] || [];
   const byN={}; matches.forEach(m=>byN[m.n]=m);
@@ -2941,7 +2961,7 @@ document.getElementById('ptClose').addEventListener('click',closePointsBreakdown
 // weiter oben in der Historie). Diese hier wurde gegen bekannte aktuelle Platzierungen verifiziert.
 const wrScrim=document.getElementById('wrscrim'), wrModal=document.getElementById('wrModal');
 const wrCache={};
-let wrGender='M';
+let wrGender=genderPref;
 async function fetchWorldRanking(gender){
   if(wrCache[gender]) return wrCache[gender];
   const g = gender==='W' ? 1 : 0;
@@ -3054,6 +3074,14 @@ document.getElementById('countrySel').addEventListener('change',e=>{
   if(cur) reRenderKeepOpen();
 });
 buildCountrySelect();
+document.getElementById('genderPrefSel').value=genderPref;
+document.getElementById('genderPrefSel').addEventListener('change',e=>{
+  genderPref=e.target.value;
+  try{ localStorage.setItem('genderPref', genderPref); }catch(err){}
+  wrGender=genderPref;
+  document.querySelectorAll('#wrGenderToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.g===genderPref));
+  if(wrModal.classList.contains('open')) renderWorldRankingInto(wrGender);
+});
 applyStaticI18n();
 // Stufen-Filter: unabhaengige Toggles (kein Radio-Verhalten wie bei den anderen Chip-Gruppen)
 document.getElementById('tierChips').addEventListener('click',e=>{
