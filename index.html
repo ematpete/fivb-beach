@@ -131,10 +131,13 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
      Zeile wie der Stadtname (rechtsbuendig via margin-left:auto), statt in der .right-Spalte
      gestapelt zu werden — haelt die Zeilenhoehe niedrig. */
   .genderBtns{display:flex;gap:11px;margin-left:auto;margin-top:6px;}
-  .genderBtn{width:44px;height:39px;border-radius:10px;border:1px solid var(--line);
+  .genderBtn{position:relative;width:44px;height:39px;border-radius:10px;border:1px solid var(--line);
     background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:13.5px;
     font-weight:700;cursor:pointer;}
   .genderBtn:hover{color:var(--ink);border-color:var(--faint);background:var(--surface-2);}
+  /* Trefferflaeche ueber die sichtbare Buttongroesse hinaus vergroessern (v.a. fuer Mobile-Tipp-
+     genauigkeit), ohne den Button optisch groesser wirken zu lassen. */
+  .genderBtn::before{content:'';position:absolute;top:-7px;bottom:-7px;left:-4px;right:-4px;}
   .nextup{grid-column:1/-1;margin-top:6px;padding-top:7px;border-top:1px dashed var(--line);
     display:flex;flex-direction:column;gap:3px;}
   .nextlab{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;
