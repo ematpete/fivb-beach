@@ -483,9 +483,12 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
      statt auf Mobile durch eine zu lange Stand-Spalte auf wenige Buchstaben gequetscht zu
      werden. Kompaktes Symbol (siehe .stand-badge) statt Fliesstext macht das erst moeglich. */
   .teamstable{table-layout:fixed;}
-  .teamstable .seedcol{width:30px;}
-  .teamstable .ptscol{width:56px;}
+  .teamstable .seedcol{width:34px;}
+  .teamstable .ptscol{width:52px;}
   .teamstable .standcol{width:34px;text-align:center;}
+  /* Spaltenkoepfe duerfen bei so schmalen festen Breiten nicht umbrechen (sonst ueberlagern
+     sich die Zeilen) — lieber abschneiden, volles Label steht als title-Tooltip zur Verfuegung. */
+  .teamstable th{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .teamstable td.stand{text-align:center;padding-left:2px;padding-right:2px;}
   .stand-badge{display:inline-flex;align-items:center;justify-content:center;gap:2px;
     font-family:var(--mono);font-size:11px;font-weight:700;}
@@ -2128,6 +2131,32 @@ function renderPoolStandings(rm, allMatches){
   return `<table class="standings"><thead><tr><th></th><th>Team</th><th class="n">${t('S','W')}</th>
     <th class="n">${t('Sätze','Sets')}</th><th class="n">${t('Bälle','Points')}</th></tr></thead><tbody>${trs}</tbody></table>`;
 }
+// Manche Turniere spielen die Gruppenphase in mehreren Wellen (z.B. CEV-Jugend-EM: erst
+// groessere Startgruppen, danach anhand deren Ergebnis neu gemischte kleinere Kreuzgruppen).
+// Erkennungsmerkmal: ein Team taucht in mehr als einem Pool-Code auf — in einer einzelnen
+// regulaeren Gruppenphase ist das unmoeglich, da jedes Team dort genau einer Gruppe angehoert.
+// Gibt null zurueck, wenn keine Ueberschneidung gefunden wird (der ganz ueberwiegende
+// Normalfall: eine einzelne Gruppenphase), sonst rc -> Wellen-Index (0-basiert).
+function poolWaveOf(groupCodes, matches){
+  const teamsOfPool={};
+  for(const rc of groupCodes){
+    const teams=new Set();
+    matches.filter(m=>m.rc===rc).forEach(m=>{ if(m.a) teams.add(m.a); if(m.b) teams.add(m.b); });
+    teamsOfPool[rc]=teams;
+  }
+  const anyOverlap=groupCodes.some((rc,i)=>groupCodes.slice(i+1).some(rc2=>
+    [...teamsOfPool[rc]].some(nm=>teamsOfPool[rc2].has(nm))));
+  if(!anyOverlap) return null;
+  const minDate=rc=>matches.filter(m=>m.rc===rc).reduce((mn,m)=>(!mn||(m.date&&m.date<mn))?m.date:mn, null);
+  const waveByRc={};
+  let wave=-1, lastDate=null;
+  for(const rc of groupCodes){
+    const d=minDate(rc);
+    if(lastDate===null || (d && d>lastDate)){ wave++; lastDate=d; }
+    waveByRc[rc]=wave;
+  }
+  return waveByRc;
+}
 
 function renderList(phase){
   const {matches}=cur;
@@ -2187,7 +2216,23 @@ function renderList(phase){
   if(phase==='pool'){
     const groupCodes=codes.filter(c=>c.macro==='group');
     if(!groupCodes.length) return `<div class="bkt-note">${t('Für dieses Turnier gibt es keine Gruppenphase.','This tournament has no group phase.')}</div>`;
-    return groupCodes.map(c=>renderRound(c.rc,c.rn)).join('');
+    // Manche Turniere (z.B. CEV-Jugend-EM) spielen die Gruppenphase in mehreren Wellen: erst
+    // groessere Startgruppen, danach anhand deren Ergebnis neu gemischte kleinere Kreuzgruppen
+    // — daher unterschiedlich grosse Gruppen im selben Turnier. Kennzeichnung nur einblenden,
+    // wenn poolWaveOf() das tatsaechlich erkennt (Team taucht in >1 Pool auf), sonst (der
+    // ganz ueberwiegende Normalfall: eine einzelne Gruppenphase) unveraendert wie bisher.
+    const waveByRc=poolWaveOf(groupCodes.map(c=>c.rc), matches);
+    if(!waveByRc) return groupCodes.map(c=>renderRound(c.rc,c.rn)).join('');
+    let out='', lastWave=null;
+    for(const c of groupCodes){
+      const w=waveByRc[c.rc];
+      if(w!==lastWave){
+        out += `<div class="dband group"><span class="ico"><span>👥</span></span>${t(`Gruppenphase ${w+1}`,`Group stage ${w+1}`)}</div>`;
+        lastWave=w;
+      }
+      out += renderRound(c.rc,c.rn);
+    }
+    return out;
   }
   if(phase==='quali'){
     const qualiCodes=codes.filter(c=>c.macro==='quali');
@@ -2339,8 +2384,8 @@ function renderSeedList(pointsByKey){
   const sections=ENTRY_SECTIONS.filter(([key])=>rows.some(r=>r.entryKey===key)).map(([key,label])=>{
     const items=rows.filter(r=>r.entryKey===key);
     return `<div class="entrysection"><div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
-      <table class="standings teamstable"><thead><tr><th class="n seedcol">${t('Setzung','Seed')}</th><th>Team</th>
-      <th class="n ptscol">${t('Punkte (Setzung)','Points (seeding)')}</th><th class="standcol" title="${t('Stand','Status')}">${t('Stand','Status')}</th></tr></thead>
+      <table class="standings teamstable"><thead><tr><th class="n seedcol" title="${t('Setzung','Seed')}">${t('Setz.','Seed')}</th><th>Team</th>
+      <th class="n ptscol" title="${t('Punkte (Setzung)','Points (seeding)')}">${t('Pkt.','Pts.')}</th><th class="standcol" title="${t('Stand','Status')}"></th></tr></thead>
       <tbody>${items.map(rowHtml).join('')}</tbody></table></div>`;
   }).join('');
   // Ein echter Draw existiert per Definition erst nach der Setzung — hier also immer die
@@ -2417,7 +2462,7 @@ function renderEntryTiers({rows,deadline}){
       <td class="nm">${playerLink(r.p2no,r.p2)}</td>
       <td class="n">${r.points!=null?r.points:'–'}</td></tr>`).join('');
     return `<div class="entrysection"><div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
-      <table class="standings teamstable"><thead><tr><th class="n seedcol">#</th><th>${t('Spieler:in 1','Player 1')}</th><th>${t('Spieler:in 2','Player 2')}</th><th class="n ptscol">${ptsLabel}</th></tr></thead>
+      <table class="standings teamstable"><thead><tr><th class="n seedcol">#</th><th>${t('Spieler:in 1','Player 1')}</th><th>${t('Spieler:in 2','Player 2')}</th><th class="n ptscol" title="${ptsLabel}">${t('Pkt.','Pts.')}</th></tr></thead>
       <tbody>${trs}</tbody></table></div>`;
   }).join('');
   return sections + `<p class="bkt-note">${t(
