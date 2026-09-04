@@ -95,6 +95,14 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     display:inline-flex;align-items:center;gap:6px;transition:background .12s,color .12s,border-color .12s;}
   .chip:hover{color:var(--ink);}
   .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+  /* Stufen-Chips sind der Verband-Auswahl untergeordnet (nur sichtbar/wirksam fuer den
+     gewaehlten Verband) — dezent andere Form/Farbe, damit auf einen Blick klar ist, dass es
+     sich um eine zweite, abhaengige Filterebene handelt statt einer gleichrangigen. */
+  #tierChips.chips{gap:5px;}
+  #tierChips .chip{border-radius:7px;font-size:11.5px;padding:5px 10px;
+    background:color-mix(in srgb,var(--water) 6%,var(--surface));
+    border-color:color-mix(in srgb,var(--water) 25%,var(--line));}
+  #tierChips .chip[aria-pressed="true"]{background:var(--water);color:#fff;border-color:var(--water);}
   .chip .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.9;}
   .chip.sep{margin-left:8px;padding-left:14px;border-left:1px solid var(--line);}
 
@@ -391,7 +399,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .pcname{font-size:19px;letter-spacing:-.01em;color:var(--ink);text-transform:none;
     display:flex;align-items:center;gap:12px;}
   .pcname b{font-weight:800;}
-  .pcphoto{width:68px;height:68px;border-radius:50%;object-fit:cover;object-position:top center;
+  .pcphoto{width:88px;height:88px;border-radius:50%;object-fit:cover;object-position:top center;
     background:var(--surface-2);flex:0 0 auto;border:1px solid var(--line);}
   .lastmatches{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);}
   .lastm{display:grid;grid-template-columns:30px 80px 1fr;gap:8px;align-items:center;
@@ -464,12 +472,26 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .standings td{padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
   .standings tr:last-child td{border-bottom:none;}
   .standings td.pos{color:var(--faint);font-family:var(--mono);width:16px;}
-  .standings td.nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;}
+  .standings td.nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .standings td.entry{color:var(--faint);font-size:11.5px;}
   .standings td.seedres.champ{color:var(--gold);font-weight:700;}
   .standings td.seedres.bronze{color:var(--gold);font-weight:600;}
   .standings td.seedres.active{color:var(--green);font-weight:600;}
   .standings td.seedres.out{color:var(--faint);}
+  /* Teams-Tab (Meldeliste + echte Setzliste): feste Spaltenbreiten fuer die schmalen Spalten,
+     damit der Teamname (die mit Abstand wichtigste Information) den restlichen Platz bekommt,
+     statt auf Mobile durch eine zu lange Stand-Spalte auf wenige Buchstaben gequetscht zu
+     werden. Kompaktes Symbol (siehe .stand-badge) statt Fliesstext macht das erst moeglich. */
+  .teamstable{table-layout:fixed;}
+  .teamstable .seedcol{width:30px;}
+  .teamstable .ptscol{width:56px;}
+  .teamstable .standcol{width:34px;text-align:center;}
+  .teamstable td.stand{text-align:center;padding-left:2px;padding-right:2px;}
+  .stand-badge{display:inline-flex;align-items:center;justify-content:center;gap:2px;
+    font-family:var(--mono);font-size:11px;font-weight:700;}
+  .stand-badge.bronze{color:var(--gold);}
+  .stand-badge.out{color:var(--faint);}
+  .stand-badge.active .pulse{width:7px;height:7px;}
   .pts-click{cursor:pointer;border-bottom:1px dashed var(--faint);}
   .pts-click:hover{color:var(--accent);border-color:var(--accent);}
   .ptbd-player{margin-bottom:14px;}
@@ -2289,6 +2311,18 @@ const POINTS_BREAKDOWN_CAVEAT = () => t(
 function renderSeedList(pointsByKey){
   const rows=buildSeedList(cur.matches);
   if(!rows.length) return null;  // kein echter Draw vorhanden — setView faellt auf die Meldeliste zurueck
+  // Kompaktes Symbol statt Fliesstext ("Aus: Achtelfinale"/"still in the draw") in der Stand-
+  // Spalte — der volle Text war v.a. auf Mobile der Hauptgrund, warum die Teamname-Spalte
+  // daneben so schmal wurde, dass Namen abgeschnitten wirkten. Platzierung kommt von
+  // derivedRanking() (dieselbe Zahl wie im Ranking-Tab), Team bleibt aber die breiteste Spalte.
+  const placeByName={}; derivedRanking(cur.matches).forEach(r=>{ placeByName[r.name]=r.place; });
+  const standBadge=sr=>{
+    const place=placeByName[sr.name];
+    if(sr.cls==='champ') return `<span class="stand-badge champ" title="${sr.result}">🏆</span>`;
+    if(sr.cls==='bronze') return `<span class="stand-badge bronze" title="${sr.result}">🥉${place?` ${place}.`:''}</span>`;
+    if(sr.cls==='active') return `<span class="stand-badge active" title="${sr.result}"><span class="pulse"></span></span>`;
+    return `<span class="stand-badge out" title="${sr.result}">${place?`${place}.`:'–'}</span>`;
+  };
   const rowHtml=sr=>{
     const pts = pointsByKey && pointsByKey[seedKey(sr.p1no,sr.p2no)];
     const ptsCell = pts!=null
@@ -2297,7 +2331,7 @@ function renderSeedList(pointsByKey){
       : '–';
     return `<tr><td class="pos">${sr.seed||'–'}</td><td class="nm">${sr.name} ${fed(sr.fed)}
       ${sr.fromQuali?`<span class="qbadge" title="${t('Aus der Qualifikation nachgerückt','Advanced from qualification')}">Q</span>`:''}</td>
-    <td class="n">${ptsCell}</td><td class="seedres ${sr.cls}">${sr.result}</td></tr>`;
+    <td class="n">${ptsCell}</td><td class="stand">${standBadge(sr)}</td></tr>`;
   };
   // Gleiche Abschnittsgliederung (Hauptfeld/Qualifikation) wie in der vorlaeufigen Meldeliste
   // (renderEntryTiers), damit die Darstellung nicht plötzlich anders aussieht, sobald der
@@ -2305,8 +2339,8 @@ function renderSeedList(pointsByKey){
   const sections=ENTRY_SECTIONS.filter(([key])=>rows.some(r=>r.entryKey===key)).map(([key,label])=>{
     const items=rows.filter(r=>r.entryKey===key);
     return `<div class="entrysection"><div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
-      <table class="standings"><thead><tr><th class="n">${t('Setzung','Seed')}</th><th>Team</th>
-      <th class="n">${t('Punkte (Setzung)','Points (seeding)')}</th><th>${t('Stand','Status')}</th></tr></thead>
+      <table class="standings teamstable"><thead><tr><th class="n seedcol">${t('Setzung','Seed')}</th><th>Team</th>
+      <th class="n ptscol">${t('Punkte (Setzung)','Points (seeding)')}</th><th class="standcol" title="${t('Stand','Status')}">${t('Stand','Status')}</th></tr></thead>
       <tbody>${items.map(rowHtml).join('')}</tbody></table></div>`;
   }).join('');
   // Ein echter Draw existiert per Definition erst nach der Setzung — hier also immer die
@@ -2383,7 +2417,7 @@ function renderEntryTiers({rows,deadline}){
       <td class="nm">${playerLink(r.p2no,r.p2)}</td>
       <td class="n">${r.points!=null?r.points:'–'}</td></tr>`).join('');
     return `<div class="entrysection"><div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
-      <table class="standings"><thead><tr><th class="n">#</th><th>${t('Spieler:in 1','Player 1')}</th><th>${t('Spieler:in 2','Player 2')}</th><th class="n">${ptsLabel}</th></tr></thead>
+      <table class="standings teamstable"><thead><tr><th class="n seedcol">#</th><th>${t('Spieler:in 1','Player 1')}</th><th>${t('Spieler:in 2','Player 2')}</th><th class="n ptscol">${ptsLabel}</th></tr></thead>
       <tbody>${trs}</tbody></table></div>`;
   }).join('');
   return sections + `<p class="bkt-note">${t(
@@ -2621,11 +2655,11 @@ function openPlayerCard(no){
   // Offizielles FIVB-Portraitfoto, sofern vorhanden — GetImage.asmx liefert kein CORS, aber
   // ein <img> braucht das nicht; onerror blendet das Element aus, falls FIVB fuer diese
   // Spieler:in kein Foto hinterlegt hat, statt ein kaputtes Bild-Icon zu zeigen.
-  // Width=136 laesst FIVB serverseitig auf WebP verkleinern (empirisch getestet: Original oft
+  // Width=176 laesst FIVB serverseitig auf WebP verkleinern (empirisch getestet: Original oft
   // >1MB fuers volle Portraet, mit Width~4-6KB) - ohne den Parameter dauert das Laden bei einem
-  // 68px-Kreis unnoetig lang. 136 statt 68 fuer scharfe Darstellung auf Retina-Displays.
+  // 88px-Kreis unnoetig lang. 176 statt 88 fuer scharfe Darstellung auf Retina-Displays.
   document.getElementById('pmTitle').innerHTML = `${t('Spielerprofil','Player profile')}${p?`<div class="pcname">
-    <img class="pcphoto" src="https://www.fivb.org/Vis2009/Images/GetImage.asmx?No=${no}&amp;Type=Player&amp;Width=136" alt="">
+    <img class="pcphoto" src="https://www.fivb.org/Vis2009/Images/GetImage.asmx?No=${no}&amp;Type=Player&amp;Width=176" alt="">
     <div><div>${p.fn||''} <b>${p.ln||''}</b></div>${fed(p.fed)}</div></div>`:''}`;
   const photoEl=document.querySelector('#pmTitle .pcphoto');
   if(photoEl) photoEl.onerror=()=>photoEl.remove();
