@@ -434,6 +434,9 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     color:var(--muted);margin:16px 0 6px;display:flex;align-items:center;gap:8px;}
   .dsub .pooltick{width:9px;height:9px;border-radius:3px;}
   .entrycount{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint);}
+  .entrysection{padding-top:16px;margin-top:16px;border-top:1px solid var(--line);}
+  .entrysection:first-child{padding-top:0;margin-top:0;border-top:none;}
+  .entrysection .dsub{margin-top:0;}
   .qbadge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--water);
     border:1px solid color-mix(in srgb,var(--water) 45%,var(--line));border-radius:5px;padding:0 4px;
     margin-left:5px;vertical-align:middle;}
@@ -2264,9 +2267,9 @@ function renderEntryTiers({rows,deadline}){
     const trs=items.map((r,i)=>`<tr><td class="pos">${i+1}</td><td class="nm">${r.p1}/${r.p2} ${fed(r.fed)}
       ${r.fromQuali?`<span class="qbadge" title="${t('Aus der Qualifikation nachgerückt','Advanced from qualification')}">Q</span>`:''}</td>
       <td class="n">${r.points!=null?r.points:'–'}</td></tr>`).join('');
-    return `<div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
+    return `<div class="entrysection"><div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
       <table class="standings"><thead><tr><th class="n">#</th><th>Team</th><th class="n">${ptsLabel}</th></tr></thead>
-      <tbody>${trs}</tbody></table>`;
+      <tbody>${trs}</tbody></table></div>`;
   }).join('');
   return sections + `<p class="bkt-note">${t(
     `Vorläufige Meldeliste — Wildcards und Verbandsquoten können die tatsächliche Zusammensetzung noch
