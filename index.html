@@ -116,10 +116,15 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     color:var(--muted);line-height:1.3;text-align:left;padding-left:6px;}
   .row .date b{display:block;color:var(--ink);font-weight:600;}
   .row .main{min-width:0;}
-  .row .city{font-weight:700;font-size:14.5px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;
-    flex-wrap:wrap;justify-content:space-between;}
-  .row .cityhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-  .row .country{font-size:12px;color:var(--muted);margin-top:0;}
+  /* Stadtname bricht nie um (Ellipsis stattdessen) - Org-/Stufen-Badges sitzen unten bei der
+     Laenderzeile statt hier, damit sie bei langen Namen nicht mit den M/W-Buttons um Platz
+     konkurrieren und die Karte dadurch unnoetig hoch wird (v.a. auf Mobile relevant). */
+  .row .city{font-weight:700;font-size:14.5px;letter-spacing:-.01em;display:flex;align-items:center;
+    gap:8px;justify-content:space-between;}
+  .row .cityname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto;}
+  .row .country{font-size:12px;color:var(--muted);margin-top:1px;display:flex;align-items:center;
+    flex-wrap:wrap;gap:6px;}
+  .row .countryname{white-space:nowrap;}
   .badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .tier-badge{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;
     text-transform:uppercase;padding:2px 7px;border-radius:6px;color:#fff;background:var(--tier);}
@@ -1086,13 +1091,12 @@ function eventRow(e, showNextUp){
       ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="${openAria}"`:''}>
       <div class="date">${fmtRange(e.start,e.end)}<b>${MONTHS()[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
       <div class="main">
-        <div class="city"><span class="cityhead">${e.city}
+        <div class="city"><span class="cityname">${e.city}</span>${genderBtns}</div>
+        <div class="country"><span class="countryname">${country(e.country)}</span>
           <span class="badges"><span class="org ${e.org}">${orgLabel(e.org)}</span>
           <span class="tier-badge" style="--tier:${tv}">${e.tier}</span>
-          ${!showGenderBtns ? `<span class="gender">${genders||'–'}</span>` : ''}</span></span>
-          ${genderBtns}
+          ${!showGenderBtns ? `<span class="gender">${genders||'–'}</span>` : ''}</span>
         </div>
-        <div class="country">${country(e.country)}</div>
       </div>
       <div class="right">${st}</div>
       ${showNextUp ? liveNowHtml(e)+nextUpHtml(e) : ''}
