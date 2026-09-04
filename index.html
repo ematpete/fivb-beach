@@ -56,7 +56,14 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .sub{color:var(--muted);font-size:13.5px;max-width:52ch;}
   .sub code{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--surface-2);
     padding:1px 6px;border-radius:5px;border:1px solid var(--line);}
-  .hdr-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .hdr-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  /* Drei logische Gruppen statt einer langen Kette: Ansicht/Daten (Saison, Geschlecht, Land),
+     Tools (Head-to-Head, Weltrangliste), Utility (Reload, Sprache, Theme) — je haeufiger
+     genutzt, desto weiter vorne/prominenter; Utility ganz hinten, da meist nur einmal
+     eingestellt und dank localStorage danach kaum noch angefasst. */
+  .hdr-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .hdr-group-view{padding-right:14px;border-right:1px solid var(--line);}
+  .hdr-group-tools{padding-right:14px;border-right:1px solid var(--line);}
   .stand{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.02em;}
   .themebtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;letter-spacing:.04em;}
@@ -218,10 +225,17 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
        frueher (macht die Karte unnoetig hoch), daher wie am Desktop inline in der 3. Spalte. */
     .row{grid-template-columns:56px 1fr auto;}
     header.top{flex-direction:column;align-items:stretch;}
-    .hdr-actions{gap:8px;}
-    .hdr-actions .stand{order:1;flex:1 0 100%;text-align:center;margin-top:2px;}
-    #seasonSel,#countrySel,#h2hOpenBtn{flex:1 1 auto;text-align:center;}
-    #themebtn,#refreshbtn{flex:0 0 auto;padding-left:14px;padding-right:14px;}
+    .hdr-actions{flex-direction:column;align-items:stretch;gap:10px;}
+    /* Auf Mobile keine Trennlinien mehr zwischen den Gruppen (wirkt gedrungen) — stattdessen
+       eigene, volle Zeilen pro Gruppe mit etwas Abstand; Bedienelemente insgesamt groesser
+       fuers Antippen. */
+    .hdr-group{padding-right:0;border-right:none;justify-content:center;}
+    .hdr-group-view,.hdr-group-tools{padding-bottom:10px;border-bottom:1px solid var(--line);}
+    #seasonSel,#countrySel{flex:1 1 auto;text-align:center;}
+    .hdr-group .themebtn{font-size:13.5px;padding:10px 14px;}
+    .hdr-group .h2hbtn{flex:1 1 auto;text-align:center;}
+    .genderpref .vt{padding:8px 14px;font-size:13px;}
+    #themebtn,#refreshbtn,#langBtn{flex:0 0 auto;padding-left:16px;padding-right:16px;}
     .h2hpicker{flex-direction:column;align-items:stretch;}
     .h2hvs{padding-top:0;text-align:center;}
     .h2hCompare .h2r{grid-template-columns:1fr auto;grid-template-areas:"d s" "c c" "t t";row-gap:2px;}
@@ -673,18 +687,23 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
       <h1>Beach Volleyball <span class="yr" id="yr">2026</span></h1>
     </div>
     <div class="hdr-actions">
-      <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
-      <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
-      <div class="vtoggle genderpref" id="genderPrefToggle" role="group" aria-label="Bevorzugtes Geschlecht" title="Bevorzugtes Geschlecht">
-        <button class="vt" data-g="M" type="button" aria-pressed="true">M</button>
-        <button class="vt" data-g="W" type="button" aria-pressed="false">W</button>
+      <div class="hdr-group hdr-group-view">
+        <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
+        <div class="vtoggle genderpref" id="genderPrefToggle" role="group" aria-label="Bevorzugtes Geschlecht" title="Bevorzugtes Geschlecht">
+          <button class="vt" data-g="M" type="button" aria-pressed="true">M</button>
+          <button class="vt" data-g="W" type="button" aria-pressed="false">W</button>
+        </div>
+        <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
       </div>
-      <button class="themebtn h2hbtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
-      <button class="themebtn h2hbtn" id="wrOpenBtn" type="button" title="Weltrangliste">🌍 Weltrangliste</button>
-      <span class="stand" id="stand"></span>
-      <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden" aria-label="Ergebnisse neu laden">⟳</button>
-      <button class="themebtn" id="langBtn" type="button"></button>
-      <button class="themebtn" id="themebtn" type="button" title="Theme wechseln" aria-label="Theme wechseln">◑</button>
+      <div class="hdr-group hdr-group-tools">
+        <button class="themebtn h2hbtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
+        <button class="themebtn h2hbtn" id="wrOpenBtn" type="button" title="Weltrangliste">🌍 Weltrangliste</button>
+      </div>
+      <div class="hdr-group hdr-group-util">
+        <button class="themebtn" id="refreshbtn" type="button" title="Ergebnisse neu laden" aria-label="Ergebnisse neu laden">⟳</button>
+        <button class="themebtn" id="langBtn" type="button"></button>
+        <button class="themebtn" id="themebtn" type="button" title="Theme wechseln" aria-label="Theme wechseln">◑</button>
+      </div>
     </div>
   </header>
 
@@ -713,6 +732,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     <strong id="footSrcLabel">Datenquelle:</strong> FIVB Volleyball Information System (VIS) —
     <code>GetBeachTournamentList</code> · <code>GetBeachMatchList</code>.
     <span id="footStats"></span>
+    <span class="stand" id="stand"></span>
     <span id="footNote"></span>
     <a class="src" id="vishref" href="https://fivbvis.openvolley.org/" target="_blank" rel="noopener">VIS-Doku</a>
   </footer>
@@ -3243,7 +3263,7 @@ function ensureAllSeasonsLoaded(){
 
 // ---- Daten laden / aktualisieren ----
 const fmtDate = s => { if(!s) return '—'; const [y,mo,d]=s.split('-'); return `${d}.${mo}.${y}`; };
-function updateStand(){ document.getElementById('stand').textContent = `${t('Stand','As of')}: ${fmtDate(DATA.generated)}`; }
+function updateStand(){ document.getElementById('stand').textContent = `· ${t('Stand','As of')}: ${fmtDate(DATA.generated)}`; }
 function updateMeta(){
   document.getElementById('yr').textContent = DATA.season;
   const resCount = Object.keys(DATA.results).length;
