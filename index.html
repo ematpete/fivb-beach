@@ -18,7 +18,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     --bg:#F1EEE6; --surface:#FBFAF6; --surface-2:#F5F2EA;
     --ink:#182831; --muted:#5D6B70; --faint:#8A969A; --line:#E1DBCE;
     --accent:#EC5231; --accent-ink:#fff; --water:#0E8E9C;
-    --gold:#C8922A; --green:#1FA06A;
+    --gold:#C8922A; --silver:#6B7A99; --green:#1FA06A;
     --t-elite16:#EC5231; --t-elite:#C8922A; --t-challenge:#0E8E9C; --t-futures:#79868E;
     --shadow:0 1px 2px rgba(24,40,49,.06),0 8px 28px rgba(24,40,49,.08);
     --radius:14px;
@@ -29,13 +29,13 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
      ueber den manuellen Theme-Umschalter (data-theme="dark"), siehe Block weiter unten. */
   :root[data-theme="light"]{
     --bg:#F1EEE6; --surface:#FBFAF6; --surface-2:#F5F2EA; --ink:#182831; --muted:#5D6B70;
-    --faint:#8A969A; --line:#E1DBCE; --accent:#EC5231; --water:#0E8E9C; --gold:#C8922A; --green:#1FA06A;
+    --faint:#8A969A; --line:#E1DBCE; --accent:#EC5231; --water:#0E8E9C; --gold:#C8922A; --silver:#6B7A99; --green:#1FA06A;
     --t-elite16:#EC5231; --t-elite:#C8922A; --t-challenge:#0E8E9C; --t-futures:#79868E;
     --shadow:0 1px 2px rgba(24,40,49,.06),0 8px 28px rgba(24,40,49,.08);
   }
   :root[data-theme="dark"]{
     --bg:#0D1418; --surface:#141E23; --surface-2:#18242A; --ink:#E9F0EF; --muted:#93A3A6;
-    --faint:#65777B; --line:#22323A; --accent:#FF6242; --water:#2CB7C6; --gold:#E0AB47; --green:#33C088;
+    --faint:#65777B; --line:#22323A; --accent:#FF6242; --water:#2CB7C6; --gold:#E0AB47; --silver:#9FB0C9; --green:#33C088;
     --t-elite16:#FF6242; --t-elite:#E0AB47; --t-challenge:#2CB7C6; --t-futures:#8598A0;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.45);
   }
@@ -146,21 +146,6 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .gender{font-family:var(--mono);font-size:10.5px;color:var(--faint);border:1px solid var(--line);
     border-radius:6px;padding:1px 6px;letter-spacing:.05em;}
   .right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;align-self:start;}
-  /* Direkt-Zugriff Herren/Damen, ohne erst die Zeile (= Herren-Default) zu oeffnen — klein
-     genug um nicht zu ueberladen, aber >=26px Kantenlaenge fuer Mobile-Tastbarkeit. In derselben
-     Zeile wie der Stadtname (rechtsbuendig via margin-left:auto), statt in der .right-Spalte
-     gestapelt zu werden — haelt die Zeilenhoehe niedrig. */
-  .genderBtns{display:flex;gap:11px;margin-left:auto;}
-  .genderBtn{position:relative;width:44px;height:39px;border-radius:10px;border:1px solid var(--line);
-    background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:13.5px;
-    font-weight:700;cursor:pointer;}
-  .genderBtn:hover{color:var(--ink);border-color:var(--faint);background:var(--surface-2);}
-  /* Trefferflaeche ueber die sichtbare Buttongroesse hinaus vergroessern (v.a. fuer Mobile-Tipp-
-     genauigkeit), ohne den Button optisch groesser wirken zu lassen. */
-  .genderBtn::before{content:'';position:absolute;top:-7px;bottom:-7px;left:-4px;right:-4px;}
-  /* W steht aussen (kein Nachbar rechts, dem man in die Flaeche greifen koennte) — dort etwas
-     grosszuegiger als bei M, wo links weiterhin Platz fuer den Nachbarbutton bleiben muss. */
-  .genderBtn[data-g="W"]::before{top:-9px;bottom:-9px;right:-9px;}
   .nextup{grid-column:1/-1;margin-top:6px;padding-top:7px;border-top:1px dashed var(--line);
     display:flex;flex-direction:column;gap:3px;}
   .nextlab{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;
@@ -235,7 +220,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
        der h1 plaziert statt als eigene volle Zeile — dezent/klein, da am seltensten gebraucht.
        Tools ist dadurch jetzt die letzte Zeile im normalen Fluss, braucht daher keinen eigenen
        Trennstrich mehr (der aeussere Header-Rahmen schliesst direkt danach ab). */
-    .hdr-group-util{position:absolute;top:20px;right:0;gap:4px;}
+    .hdr-group-util{position:absolute;top:8px;right:0;gap:4px;}
     .hdr-group-util .themebtn{padding:6px 9px;font-size:12px;background:transparent;border-color:transparent;color:var(--faint);}
     .hdr-group-util .themebtn:hover{border-color:var(--line);color:var(--ink);}
     #seasonSel{flex:1 1 auto;text-align:center;}
@@ -440,6 +425,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     border-radius:5px;padding:2px 0;color:#fff;white-space:nowrap;align-self:center;
     width:100%;box-sizing:border-box;justify-self:stretch;}
   .lm-res.champ{background:var(--gold);}
+  .lm-res.silver{background:var(--silver);}
   .lm-res.bronze{background:var(--water);}
   .lm-res.active{background:var(--green);}
   .lm-res.out{background:var(--faint);}
@@ -454,6 +440,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .bx .brow.feeder .bn{font-style:italic;color:#8A6FE0;}
   .bx .brow .bs{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted);}
   .bx .brow.win .bs{color:var(--green);}
+  .bx .brow .bs.bye-tag{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);}
   .bx .setline{font-size:9.5px;color:var(--faint);}
   .bx .setline .sc{min-width:12px;padding:0 3px;}
   .bx .bmatchno{position:absolute;top:-8px;left:9px;font-family:var(--mono);font-size:9px;color:var(--faint);
@@ -506,6 +493,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .standings td.nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .standings td.entry{color:var(--faint);font-size:11.5px;}
   .standings td.seedres.champ{color:var(--gold);font-weight:700;}
+  .standings td.seedres.silver{color:var(--silver);font-weight:600;}
   .standings td.seedres.bronze{color:var(--gold);font-weight:600;}
   .standings td.seedres.active{color:var(--green);font-weight:600;}
   .standings td.seedres.out{color:var(--faint);}
@@ -523,6 +511,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .teamstable td.stand{text-align:center;padding-left:2px;padding-right:2px;}
   .stand-badge{display:inline-flex;align-items:center;justify-content:center;gap:2px;
     font-family:var(--mono);font-size:11px;font-weight:700;}
+  .stand-badge.silver{color:var(--silver);}
   .stand-badge.bronze{color:var(--gold);}
   .stand-badge.out{color:var(--faint);}
   .stand-badge.active .pulse{width:7px;height:7px;}
@@ -588,6 +577,14 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .match .match-no{position:absolute;top:2px;right:6px;font-family:var(--mono);font-size:8px;
     color:var(--faint);opacity:.55;white-space:nowrap;}
   .match .teams{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  /* nur in der Spielliste (matchRowHtml mit showPhase) — sonst steht die Runde schon als
+     Gruppenueberschrift darueber und das waere doppelt. */
+  .match .mt-phase{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--water);}
+  .match .bye-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .match .bye-row .tn{color:var(--muted);}
+  .match .bye-tag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--faint);white-space:nowrap;}
   .match .team{display:grid;grid-template-columns:1fr auto 15px;gap:10px;align-items:center;}
   .match .team.win .tn{font-weight:700;}
   .match .tn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);}
@@ -780,6 +777,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
       <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO-Liste</button>
       <button class="vt" data-phase="bracket" type="button" aria-pressed="false">KO-Baum</button>
     </div>
+    <div class="vtoggle phasetoggle daytoggle" id="dayToggle" role="group" aria-label="Turniertag" hidden></div>
   </header>
   <div id="dChamp"></div>
   <div class="dbody" id="dBody"></div>
@@ -907,6 +905,7 @@ function applyStaticI18n(){
   attr('phaseToggle','aria-label',t('Turnierphase','Phase'));
   document.querySelector('#phaseToggle .vt[data-phase="ko"]').textContent=t('KO-Liste','KO list');
   document.querySelector('#phaseToggle .vt[data-phase="bracket"]').textContent=t('KO-Baum','KO bracket');
+  attr('dayToggle','aria-label',t('Turniertag','Tournament day'));
   attr('mmClose','aria-label',t('Schließen','Close'));
   attr('photoLb','aria-label',t('Foto','Photo'));
   attr('photoLbClose','aria-label',t('Schließen','Close'));
@@ -1168,22 +1167,17 @@ function eventRow(e, showNextUp){
     : e.status==='upcoming'
       ? `<span class="status upcoming">${t('Kommend','Upcoming')}</span>`
       : `<span class="status finished">${t('Gespielt','Played')}</span>`;
-  const showGenderBtns = e.M && e.W && rNo;
   const openAria = t(`${resNo?'Ergebnisse':'Setzliste'} ${e.city} öffnen`, `Open ${resNo?'results':'seeding'} for ${e.city}`);
-  const genderBtns = showGenderBtns ? `<div class="genderBtns">
-        <button class="genderBtn" data-g="M" type="button" data-idx="${e._idx}" aria-label="${t(`Herren ${e.city} öffnen`,`Open men's draw for ${e.city}`)}">M</button>
-        <button class="genderBtn" data-g="W" type="button" data-idx="${e._idx}" aria-label="${t(`Damen ${e.city} öffnen`,`Open women's draw for ${e.city}`)}">W</button>
-      </div>` : '';
   return `
     <div class="row ${rNo?'clickable':''}" style="--tier:${tv}"
       ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="${openAria}"`:''}>
       <div class="date">${fmtRange(e.start,e.end)}<b>${MONTHS()[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
       <div class="main">
-        <div class="city"><span class="cityname">${e.city}</span>${genderBtns}</div>
+        <div class="city"><span class="cityname">${e.city}</span></div>
         <div class="country"><span class="countryname">${country(e.country)}</span>
           <span class="badges"><span class="org ${e.org}">${orgLabel(e.org)}</span>
           <span class="tier-badge" style="--tier:${tv}">${e.tier}</span>
-          ${!showGenderBtns ? `<span class="gender">${genders||'–'}</span>` : ''}</span>
+          <span class="gender">${genders||'–'}</span></span>
         </div>
       </div>
       <div class="right">${st}</div>
@@ -1693,7 +1687,9 @@ const slotText = S => S.feeder
 // bracketMode: innerhalb der KO-Phase Baum statt flacher Liste zeigen — kein eigener
 // Ansicht-Tab mehr, sondern Teil der Phasen-Unterfilterung (Quali/Pool/KO/Baum), da der Baum
 // ohnehin nur die KO-Phase in anderer Darstellung ist.
-let cur=null, drawerView='list', listPhase='ko', bracketMode=false;
+// chronoDay: optionaler Tagesfilter fuer die Spielliste (null = alle Tage, Default). Kein
+// eigener Persistenzwunsch geaeussert, daher wie listPhase pro Turnier-Oeffnen zurueckgesetzt.
+let cur=null, drawerView='list', listPhase='ko', bracketMode=false, chronoDay=null;
 
 // Direktabruf beim FIVB VIS (CORS-offen) — umgeht den bis zu 20-minütigen Cache von data/<jahr>.json,
 // baut dieselbe Match-Struktur wie generate.py's get_matches() nach.
@@ -1796,7 +1792,7 @@ function derivedRanking(matches){
   const rows=buildSeedList(matches).filter(t=>t.lastMatch);
   const champ=rows.filter(t=>t.cls==='champ');
   const active=rows.filter(t=>t.cls==='active');
-  const placeable=rows.filter(t=>t.cls==='out'||t.cls==='bronze');
+  const placeable=rows.filter(t=>t.cls==='out'||t.cls==='bronze'||t.cls==='silver');
   // Reine Gruppenphasen-Ausscheider teilen sich einen Platz unabhaengig von der Pool-Buchstaben
   // (sonst z.B. "25.","26.","27." statt einheitlich "25."). Bronze-Gewinner (Platz 3) sortieren
   // knapp vor den Verlierern desselben Spiel-um-Platz-3-Matches, die sonst denselben bestRank
@@ -1948,6 +1944,7 @@ function openDrawer(ev,gender,phase){
   if(phase) drawerView='list';
   listPhase = phase || currentPhase(matches);
   bracketMode=false;  // jedes neu geoeffnete Turnier startet flach, nicht im Baum
+  chronoDay=null;  // Spielliste startet ungefiltert (alle Tage)
 
   updateDrawerContent();
   setView(drawerView);
@@ -2157,6 +2154,7 @@ function setView(v){
   drawer.classList.toggle('wide', showBracket);
   const availCount = cur.avail ? Object.values(cur.avail).filter(Boolean).length : 0;
   document.getElementById('phaseToggle').hidden = v!=='list' || (availCount<2 && !cur.bracketOK);
+  document.getElementById('dayToggle').hidden = true;  // nur im chrono-Zweig ggf. wieder eingeblendet
   const body=document.getElementById('dBody');
   if(v==='ranking'){
     const no=cur.no, matches=cur.matches;
@@ -2200,6 +2198,7 @@ function setView(v){
     return;
   }
   if(v==='chrono'){
+    buildDayToggle();
     body.innerHTML = renderChronoList();
     body.scrollTop=0;
     return;
@@ -2214,6 +2213,10 @@ function poolStandings(rm, allMatches){
   const get=(nm,fedc)=>{ const e=teams[nm] || (teams[nm]={name:nm,fed:null,w:0,l:0,sw:0,sl:0,pw:0,pl:0}); if(fedc) e.fed=fedc; return e; };
   for(const m of rm){
     if(!isFinished(m)) continue;
+    // Freilos (Bye): "finished" Match mit nur einer Teamseite — ohne diese Sonderbehandlung
+    // wuerde get(undefined,...) ein Phantom-Team in die Tabelle einschleusen und dem echten
+    // Team faelschlich eine 0:0-Niederlage anhaengen (sa===sb===0 -> aWin===false).
+    if(!m.a || !m.b) continue;
     // Ein echtes Walkover ohne jede erfasste Punktzahl (weder sa/sb noch Saetze — VIS markiert
     // es trotzdem als beendet) wuerde hier via +undefined=NaN die komplette Satz-/Punktbilanz
     // des Teams fuer den Rest der Tabelle verseuchen ("NaN" in der Spalte) — solche Matches
@@ -2278,10 +2281,29 @@ function poolWaveOf(groupCodes, matches){
 }
 
 // Eine einzelne Match-Zeile (+ ihr zugeklapptes Detail) — von renderList() (gruppiert nach
-// Runde/Pool) UND renderChronoList() (flache Datums-Reihenfolge) gemeinsam genutzt.
-function matchRowHtml(m, offset){
+// Runde/Pool) UND renderChronoList() (flache Datums-Reihenfolge) gemeinsam genutzt. showPhase
+// blendet ein kleines Runden-Label ein (in renderList() ueberfluessig, da dort schon die
+// Rundenueberschrift ueber der ganzen Gruppe steht — nur die Spielliste braucht es pro Zeile,
+// da sie absichtlich nicht nach Runde gruppiert).
+function matchRowHtml(m, offset, showPhase){
   const time=dualTime(m.date,m.time,offset,true);
   const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}`;
+  const phaseTag = showPhase ? `<div class="mt-phase">${roundLabel(m.rc,m.rn)}</div>` : '';
+  // Freilos (Bye): VIS legt fuer den freilosenden Slot ein "finished" Match mit 0:0 an, bei dem
+  // nur eine Teamseite ueberhaupt existiert, statt den Platz leer zu lassen — ohne
+  // Sonderbehandlung wirkte das wie ein echtes 0:0 gegen ein Phantom-Team ("—"). Stattdessen klar
+  // als Freilos labeln, kein Score/Aufklappen (es gab ja kein echtes Spiel).
+  if(played(m) && (!m.a || !m.b)){
+    const team=m.a||m.b, fedc=m.a?m.ca:m.cb;
+    return `<div class="match bye${isCountryHl(m.ca,m.cb)?' hl-country':''}">
+      <span class="match-no">#${m.n}</span>
+      <div class="mt">${mtLabel}</div>
+      <div class="teams">
+        ${phaseTag}
+        <div class="bye-row"><span class="tn">${teamFlag(fedc)}${team}</span><span class="bye-tag">${t('Freilos','Bye')}</span></div>
+      </div>
+    </div>`;
+  }
   if(!played(m)){
     const A=slotInfo(m,'a'), B=slotInfo(m,'b');
     // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
@@ -2290,6 +2312,7 @@ function matchRowHtml(m, offset){
       <span class="match-no">#${m.n}</span>
       <div class="mt">${mtLabel}</div>
       <div class="teams">
+        ${phaseTag}
         <div class="team ${A.feeder?'feeder':''}"><span class="tn">${slotText(A)}</span><span></span><span class="pt">–</span></div>
         <div class="team ${B.feeder?'feeder':''}"><span class="tn">${slotText(B)}</span><span></span><span class="pt">–</span></div>
       </div>
@@ -2304,6 +2327,7 @@ function matchRowHtml(m, offset){
     <span class="match-no">#${m.n}</span>
     <div class="mt">${mtLabel}</div>
     <div class="teams">
+      ${phaseTag}
       ${liveTag}
       <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}</span>${setline(m,0)}<span class="pt">${m.sa??'–'}</span></div>
       <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}</span>${setline(m,1)}<span class="pt">${m.sb??'–'}</span></div>
@@ -2315,10 +2339,23 @@ function matchRowHtml(m, offset){
 // "Spielliste": alle Matches des Turniers unabhaengig von Runde/Pool/Baum rein chronologisch
 // nach Datum/Uhrzeit, wie bei einem Wettanbieter — nur nach Tag gruppiert (Lesbarkeit), sonst
 // keine Struktur/Gruppierung nach Turnierrunde.
+// Tagesumschalter oberhalb der Spielliste — ein Knopf pro Turniertag, der die Liste auf genau
+// diesen Tag eingrenzt; standardmaessig (chronoDay=null) ist keiner gedrueckt und alle Tage
+// sind sichtbar. Nur eingeblendet, wenn es ueberhaupt mehr als einen Spieltag gibt.
+function buildDayToggle(){
+  const el=document.getElementById('dayToggle');
+  const days=[...new Set(cur.matches.map(m=>m.date).filter(Boolean))].sort();
+  if(days.length<2){ el.hidden=true; el.innerHTML=''; return; }
+  if(chronoDay && !days.includes(chronoDay)) chronoDay=null;
+  el.hidden=false;
+  el.innerHTML = days.map(d=>
+    `<button class="vt" data-day="${d}" type="button" aria-pressed="${d===chronoDay}">${shortDate(d)}</button>`).join('');
+}
 function renderChronoList(){
   const {matches}=cur;
   const offset=venueOffsetMinutes(cur.ev.country, cur.ev.start);
-  const sorted=[...matches].sort((a,b)=>
+  const filtered = chronoDay ? matches.filter(m=>m.date===chronoDay) : matches;
+  const sorted=[...filtered].sort((a,b)=>
     (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||'') || a.n-b.n);
   if(!sorted.length) return `<div class="bkt-note">${t('Für dieses Turnier liegen noch keine angesetzten Spiele vor.','No scheduled matches for this tournament yet.')}</div>`;
   let out='', curDate='';
@@ -2327,7 +2364,7 @@ function renderChronoList(){
       curDate=m.date;
       out += `<div class="dsub">${fmtDate(curDate)}</div>`;
     }
-    out += matchRowHtml(m, offset);
+    out += matchRowHtml(m, offset, true);
   }
   return out;
 }
@@ -2450,9 +2487,14 @@ function buildSeedList(matches){
     const fromQuali = cameFromQuali && hasMainDrawMatch;
     for(const {m,side} of tm.matches){
       if(!isFinished(m)) continue;
+      // Freilos (Bye): "finished" Match ohne echten Gegner (0:0, andere Seite fehlt komplett)
+      // zaehlt nicht als Ergebnis — sonst wuerde ein Team, das per Bye aufgestiegen ist, hier
+      // faelschlich als "Aus: <Runde>" gefuehrt (0:0 -> won===false).
+      if(!m.a || !m.b) continue;
       const rank=roundRank(m.rc,m.rn);
       if(rank<bestRank){ bestRank=rank; best={m,side}; }
     }
+    const hasPending = tm.matches.some(({m:om})=>!isFinished(om));
     let result=t('noch nicht gestartet','not started yet'), cls='out';
     if(best){
       const {m,side}=best;
@@ -2461,6 +2503,7 @@ function buildSeedList(matches){
       // sondern Turnierende mit Platzierung (1./3.), genau wie eine Niederlage dort (2./4.).
       if(won && m.rc==='F1'){ result='Champion'; cls='champ'; }
       else if(won && (m.rc==='F3'||m.rc==='BM')){ result=t('Bronze (3. Platz)','Bronze (3rd place)'); cls='bronze'; }
+      else if(!won && m.rc==='F1'){ result=t('Finale (2. Platz)','Final (2nd place)'); cls='silver'; }
       else if(!won){ result=t(`Aus: ${roundLabel(m.rc,m.rn)}`,`Out: ${roundLabel(m.rc,m.rn)}`); cls='out'; }
       else {
         // Gewonnen, aber weder Finale noch Spiel um Platz 3 — nur dann als "noch im Turnier"
@@ -2468,10 +2511,14 @@ function buildSeedList(matches){
         // mehrere Pool-Spiele mit demselben Rundencode, von denen zufaellig das zuerst
         // gefundene ein Sieg war, oder ein nie erfasstes Folgematch) blieb ein Team hier
         // faelschlich fuer immer "aktiv", obwohl das Turnier laengst vorbei ist.
-        const hasPending = tm.matches.some(({m:om})=>!isFinished(om));
         if(hasPending){ result=t('noch im Turnier','still in the draw'); cls='active'; }
         else { result=t(`Aus: ${roundLabel(m.rc,m.rn)}`,`Out: ${roundLabel(m.rc,m.rn)}`); cls='out'; }
       }
+    } else if(hasPending){
+      // Kein einziges echtes (Nicht-Freilos-)Ergebnis bisher, aber ein noch offenes Match —
+      // z.B. ein Team, das bislang nur ein Freilos hatte und dessen naechstes echtes Spiel noch
+      // nicht gespielt ist. "noch nicht gestartet" waere hier irrefuehrend.
+      result=t('noch im Turnier','still in the draw'); cls='active';
     }
     return {...tm, result, cls, entryKey, fromQuali, bestRank, lastMatch: best};
   });
@@ -2506,6 +2553,7 @@ function renderSeedList(pointsByKey){
   const standBadge=sr=>{
     const place=placeByName[sr.name];
     if(sr.cls==='champ') return `<span class="stand-badge champ" title="${sr.result}">🏆</span>`;
+    if(sr.cls==='silver') return `<span class="stand-badge silver" title="${sr.result}">🥈${place?` ${place}.`:''}</span>`;
     if(sr.cls==='bronze') return `<span class="stand-badge bronze" title="${sr.result}">🥉${place?` ${place}.`:''}</span>`;
     if(sr.cls==='active') return `<span class="stand-badge active" title="${sr.result}"><span class="pulse"></span></span>`;
     return `<span class="stand-badge out" title="${sr.result}">${place?`${place}.`:'–'}</span>`;
@@ -2616,11 +2664,15 @@ function renderEntryTiers({rows,deadline}){
 
 function bracketBox(m){
   const done=played(m), live=isLive(m);
+  // Freilos (Bye): "finished" Match ohne echten Gegner — statt eines irrefuehrenden 0:0 gegen
+  // eine "offen"-Box klar als Freilos kennzeichnen, kein Score, nicht aufklickbar (kein echtes
+  // Match dahinter).
+  const isBye = done && (!m.a || !m.b);
   const A=slotInfo(m,'a'), B=slotInfo(m,'b');
-  const aWin=done && !live && +m.sa>+m.sb, bWin=done && !live && +m.sb>+m.sa;
+  const aWin=done && !live && !isBye && +m.sa>+m.sb, bWin=done && !live && !isBye && +m.sb>+m.sa;
   const brow=(S,win,score,setsHtml,seed)=>`<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="${t(`Aus ${S.roundlab}: ${S.sub}`,`From ${S.roundlab}: ${S.sub}`)}"`:''}>
-    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs">${done?score:''}</span>${done&&setsHtml?setsHtml:''}</div>`;
-  const clk = done ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}` : '';
+    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs${isBye&&S.feeder?' bye-tag':''}">${isBye?(S.feeder?t('Freilos','Bye'):''):(done?score:'')}</span>${done&&!isBye&&setsHtml?setsHtml:''}</div>`;
+  const clk = (done && !isBye) ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}` : '';
   const tag = live ? `<span class="livechip bx-live"><span class="pulse"></span>Live</span>` : '';
   return `<div class="bx ${done?'done':''}${live?' live':''}${clk}">${tag}<span class="bmatchno">#${m.n}</span>
     ${brow(A,aWin,m.sa,setline(m,0),m.sda)}${brow(B,bWin,m.sb,setline(m,1),m.sdb)}</div>`;
@@ -2799,6 +2851,14 @@ document.getElementById('phaseToggle').addEventListener('click',e=>{
     x.setAttribute('aria-pressed', ph==='bracket' ? (listPhase==='ko'&&bracketMode) : (listPhase===ph && !(ph==='ko'&&bracketMode)));
   });
   setView('list');
+});
+document.getElementById('dayToggle').addEventListener('click',e=>{
+  const b=e.target.closest('.vt'); if(!b)return;
+  // Erneuter Klick auf den schon aktiven Tag hebt den Filter wieder auf (zurueck zu "alle Tage").
+  chronoDay = chronoDay===b.dataset.day ? null : b.dataset.day;
+  document.querySelectorAll('#dayToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.day===chronoDay));
+  document.getElementById('dBody').innerHTML = renderChronoList();
+  document.getElementById('dBody').scrollTop=0;
 });
 // Match aufklappen (Detail: Satz-für-Satz, Dauer, Schiris …)
 function toggleMatch(row){
@@ -3190,12 +3250,7 @@ document.getElementById('dBody').addEventListener('keydown',e=>{
 
 // Controls
 document.getElementById('q').addEventListener('input',e=>{state.q=e.target.value;render();});
-// Direkt-Zugriff Herren/Damen in der Turnierzeile — Delegation auf #list, da die Zeilen bei
-// jedem render() neu erzeugt werden; stopPropagation() verhindert, dass zusaetzlich der
-// Zeilen-Klick (oeffnet mit Herren-Default) mitfeuert.
 document.getElementById('list').addEventListener('click',e=>{
-  const gb=e.target.closest('.genderBtn');
-  if(gb){ e.stopPropagation(); openDrawer(DATA.events[+gb.dataset.idx], gb.dataset.g); return; }
   const nu=e.target.closest('.nextup-click');
   if(nu){ e.stopPropagation(); openDrawer(DATA.events[+nu.dataset.idx], nu.dataset.gender, nu.dataset.phase); return; }
 });
