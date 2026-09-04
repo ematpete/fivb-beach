@@ -62,8 +62,14 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
      genutzt, desto weiter vorne/prominenter; Utility ganz hinten, da meist nur einmal
      eingestellt und dank localStorage danach kaum noch angefasst. */
   .hdr-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-  .hdr-group-view{padding-right:14px;border-right:1px solid var(--line);}
+  .hdr-group-view{padding-right:14px;border-right:1px solid var(--line);align-items:flex-end;}
   .hdr-group-tools{padding-right:14px;border-right:1px solid var(--line);}
+  /* Kleine Beschriftung ueber Saison/Vorauswahl/Land-Hervorheben — ohne die drei Symbole/
+     Abkuerzungen (Jahreszahl, "M/W", Flaggen-Dropdown) sind die Controls bei einem ersten
+     Besuch nicht unbedingt selbsterklaerend. */
+  .hdr-field{display:flex;flex-direction:column;gap:3px;}
+  .hdr-field-lab{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--faint);padding-left:2px;}
   .stand{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.02em;}
   .themebtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;letter-spacing:.04em;}
@@ -131,15 +137,16 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     color:var(--muted);line-height:1.3;text-align:left;padding-left:6px;}
   .row .date b{display:block;color:var(--ink);font-weight:600;}
   .row .main{min-width:0;}
-  /* Stadtname bricht nie um (Ellipsis stattdessen) - Org-/Stufen-Badges sitzen unten bei der
-     Laenderzeile statt hier, damit sie bei langen Namen nicht mit den M/W-Buttons um Platz
+  /* Stadtname bricht nie um (Ellipsis stattdessen); Land steht klein direkt daneben. Org-/
+     Stufen-/Geschlecht-Badges in der Zeile darunter, damit sie bei langen Namen nicht um Platz
      konkurrieren und die Karte dadurch unnoetig hoch wird (v.a. auf Mobile relevant). */
-  .row .city{font-weight:700;font-size:14.5px;letter-spacing:-.01em;display:flex;align-items:center;
-    gap:8px;justify-content:space-between;}
-  .row .cityname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto;}
+  .row .city{font-weight:700;font-size:14.5px;letter-spacing:-.01em;display:flex;align-items:baseline;
+    gap:6px;}
+  .row .cityname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto;}
+  .row .city .countryname{font-weight:400;font-size:12px;color:var(--muted);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;min-width:0;}
   .row .country{font-size:12px;color:var(--muted);margin-top:1px;display:flex;align-items:center;
     flex-wrap:wrap;gap:6px;}
-  .row .countryname{white-space:nowrap;}
   .badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .tier-badge{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;
     text-transform:uppercase;padding:2px 7px;border-radius:6px;color:#fff;background:var(--tier);}
@@ -220,17 +227,28 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
        der h1 plaziert statt als eigene volle Zeile — dezent/klein, da am seltensten gebraucht.
        Tools ist dadurch jetzt die letzte Zeile im normalen Fluss, braucht daher keinen eigenen
        Trennstrich mehr (der aeussere Header-Rahmen schliesst direkt danach ab). */
-    .hdr-group-util{position:absolute;top:8px;right:0;gap:4px;}
+    .hdr-group-util{position:absolute;top:10px;right:0;gap:4px;}
     .hdr-group-util .themebtn{padding:6px 9px;font-size:12px;background:transparent;border-color:transparent;color:var(--faint);}
     .hdr-group-util .themebtn:hover{border-color:var(--line);color:var(--ink);}
-    #seasonSel{flex:1 1 auto;text-align:center;}
+    /* Die absolut positionierte Utility-Gruppe liegt oben rechts ueber der normalen .brand-Zeile
+       — der Eyebrow-Text ("FIVB & CEV Beach Volleyball") ist auf schmalen Screens lang genug,
+       um sonst mit den Icons zu kollidieren; hier Platz dafuer reservieren und noetigenfalls
+       abschneiden statt zu ueberlappen. */
+    .brand .eyebrow{max-width:calc(100% - 120px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    /* .hdr-field ist der direkte Flex-Child von .hdr-group-view (Saison/Vorauswahl/Land je
+       Label+Control gestapelt) — Wachstum muss daher am Feld selbst ansetzen, nicht mehr am
+       inneren Control, sonst wirkt sich flex:1 nur noch innerhalb der eigenen Spalte aus. */
+    #seasonSel{width:100%;text-align:center;}
+    #seasonSel-field{flex:1 1 auto;}
     .hdr-group .themebtn{font-size:13.5px;padding:10px 14px;}
     .hdr-group .h2hbtn{flex:1 1 auto;text-align:center;}
     /* M/W soll das breiteste/am leichtesten zu treffende Element in der Gruppe sein — Land
        dafuer bewusst kompakter und nicht mitwachsend. */
-    .genderpref{flex:1 1 auto;justify-content:center;}
+    #genderPref-field{flex:1 1 auto;}
+    .genderpref{width:100%;justify-content:center;}
     .genderpref .vt{flex:1 1 auto;padding:12px 20px;font-size:14.5px;}
-    .hdr-group .countrysel{flex:0 1 auto;font-size:11.5px;padding:8px 10px;}
+    #countrySel-field{flex:0 1 auto;}
+    .hdr-group .countrysel{width:100%;font-size:11.5px;padding:8px 10px;}
     #themebtn,#refreshbtn,#langBtn{flex:0 0 auto;padding-left:16px;padding-right:16px;}
     .h2hpicker{flex-direction:column;align-items:stretch;}
     .h2hvs{padding-top:0;text-align:center;}
@@ -294,6 +312,12 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     border-color:color-mix(in srgb,var(--water) 25%,var(--line));}
   .phasetoggle .vt[aria-pressed="true"]{background:color-mix(in srgb,var(--water) 16%,var(--surface));
     color:var(--water);}
+  /* KO-Liste/KO-Baum sind dieselbe Phase, nur zwei Ansichten davon — als eigene Untergruppe mit
+     gemeinsamer Huelle darstellen statt als zwei gleichrangige, unabhaengige Optionen wie
+     Quali/Pool, damit der Zusammenhang auf einen Blick klar ist. */
+  .phase-ko-group{display:flex;gap:2px;padding:2px;border-radius:9px;
+    background:color-mix(in srgb,var(--water) 10%,transparent);
+    border:1px dashed color-mix(in srgb,var(--water) 30%,transparent);}
   /* Feeder-Slot (offener KO-Platz) */
   .team.feeder .tn{color:var(--faint);font-style:italic;}
   .team .feedref{font-family:var(--mono);font-style:normal;font-size:10.5px;color:#8A6FE0;
@@ -418,7 +442,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .pcphoto{width:88px;height:88px;border-radius:50%;object-fit:cover;object-position:top center;
     background:var(--surface-2);flex:0 0 auto;border:1px solid var(--line);}
   .lastmatches{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);}
-  .lastm{display:grid;grid-template-columns:30px 80px 1fr;gap:8px;align-items:center;
+  .lastm{display:grid;grid-template-columns:30px 116px 1fr;gap:8px;align-items:center;
     padding:5px 4px;border-radius:6px;font-size:12px;cursor:pointer;}
   .lastm:hover{background:var(--surface-2);}
   .lm-res{font-family:var(--mono);font-weight:700;font-size:10.5px;text-align:center;
@@ -429,7 +453,9 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .lm-res.bronze{background:var(--water);}
   .lm-res.active{background:var(--green);}
   .lm-res.out{background:var(--faint);}
-  .lm-date{font-family:var(--mono);color:var(--faint);font-size:11px;white-space:nowrap;}
+  .lm-date{font-family:var(--mono);color:var(--faint);font-size:11px;white-space:nowrap;
+    min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  .lm-date .lm-partner{color:var(--muted);}
   .lm-opp{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
   .lm-city{grid-column:2/-1;font-size:11px;color:var(--faint);margin-top:-3px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -699,12 +725,21 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     </div>
     <div class="hdr-actions">
       <div class="hdr-group hdr-group-view">
-        <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
-        <div class="vtoggle genderpref" id="genderPrefToggle" role="group" aria-label="Bevorzugtes Geschlecht" title="Bevorzugtes Geschlecht">
-          <button class="vt" data-g="M" type="button" aria-pressed="true">M</button>
-          <button class="vt" data-g="W" type="button" aria-pressed="false">W</button>
+        <div class="hdr-field" id="seasonSel-field">
+          <span class="hdr-field-lab" id="seasonSelLab">Saison</span>
+          <select class="themebtn" id="seasonSel" title="Saison wählen"></select>
         </div>
-        <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
+        <div class="hdr-field" id="genderPref-field">
+          <span class="hdr-field-lab" id="genderPrefLab">Vorauswahl</span>
+          <div class="vtoggle genderpref" id="genderPrefToggle" role="group" aria-label="Bevorzugtes Geschlecht" title="Bevorzugtes Geschlecht">
+            <button class="vt" data-g="M" type="button" aria-pressed="true">M</button>
+            <button class="vt" data-g="W" type="button" aria-pressed="false">W</button>
+          </div>
+        </div>
+        <div class="hdr-field" id="countrySel-field">
+          <span class="hdr-field-lab" id="countrySelLab">Hervorheben</span>
+          <select class="themebtn countrysel" id="countrySel" title="Matches eines Landes hervorheben"></select>
+        </div>
       </div>
       <div class="hdr-group hdr-group-tools">
         <button class="themebtn h2hbtn" id="h2hOpenBtn" type="button" title="Zwei Spieler:innen vergleichen">🆚 Head to Head</button>
@@ -774,8 +809,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     <div class="vtoggle phasetoggle" id="phaseToggle" role="group" aria-label="Turnierphase" hidden>
       <button class="vt" data-phase="quali" type="button" aria-pressed="false">Quali</button>
       <button class="vt" data-phase="pool" type="button" aria-pressed="false">Pool</button>
-      <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO-Liste</button>
-      <button class="vt" data-phase="bracket" type="button" aria-pressed="false">KO-Baum</button>
+      <div class="phase-ko-group">
+        <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO-Liste</button>
+        <button class="vt" data-phase="bracket" type="button" aria-pressed="false">KO-Baum</button>
+      </div>
     </div>
     <div class="vtoggle phasetoggle daytoggle" id="dayToggle" role="group" aria-label="Turniertag" hidden></div>
   </header>
@@ -865,6 +902,9 @@ function applyStaticI18n(){
   const attr=(id,name,val)=>{ const el=document.getElementById(id); if(el) el.setAttribute(name,val); };
   set('seasonSel','title',t('Saison wählen','Select season'));
   set('countrySel','title',t('Matches eines Landes hervorheben','Highlight matches for a country'));
+  set('seasonSelLab','textContent',t('Saison','Season'));
+  set('genderPrefLab','textContent',t('Vorauswahl','Default'));
+  set('countrySelLab','textContent',t('Hervorheben','Highlight'));
   attr('genderPrefToggle','aria-label',t('Bevorzugtes Geschlecht','Preferred gender'));
   attr('genderPrefToggle','title',t('Bevorzugtes Geschlecht: was standardmäßig zuerst geöffnet wird','Preferred gender: which side opens by default'));
   document.querySelector('#genderPrefToggle .vt[data-g="M"]').title=t('Herren zuerst','Men first');
@@ -962,7 +1002,11 @@ const state={q:'',org:'FIVB',tiers:{},country:savedCountryPref};
 let genderPref='M'; try{ genderPref=localStorage.getItem('genderPref')||'M'; }catch(e){}
 // Matches mit Beteiligung eines Teams aus dem bevorzugten Land hervorheben (Listen- und
 // Turnier-Widgets) — reine Optik, kein Filter, daher unabhaengig von allen anderen Kriterien.
-const isCountryHl = (ca,cb) => !!state.country && (ca===state.country || cb===state.country);
+// Bei ÖVV/DVV/MEVZA-Turnieren ergibt das kaum Sinn (fast das ganze Feld bzw. der Grossteil ist
+// ohnehin aus derselben Region) und würde nur unnötig fast die ganze Liste markieren — daher
+// dort bewusst deaktiviert (org als optionaler dritter Parameter).
+const COUNTRY_HL_EXCLUDED_ORGS = new Set(['OEVV','DVV','MEVZA']);
+const isCountryHl = (ca,cb,org) => !!state.country && !COUNTRY_HL_EXCLUDED_ORGS.has(org) && (ca===state.country || cb===state.country);
 // Pro Verband eigene Stufen-Chipgruppe (Rohwerte aus classify() -> zusammengefasster Chip).
 // "def" = initial aktiv. Verbaende ohne Eintrag (bzw. mit nur einer moeglichen Stufe wie
 // ÖVV/DVV "National") zeigen gar keine Stufenzeile — da gibt es nichts zu filtern.
@@ -1122,7 +1166,7 @@ function nextUpHtml(e){
   const next=nextUpMatches(e);
   if(!next.length) return '';
   const offset=venueOffsetMinutes(e.country, e.start);
-  const rows=next.map(({m,g})=>`<div class="nextrow${isCountryHl(m.ca,m.cb)?' hl-country':''}"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
+  const rows=next.map(({m,g})=>`<div class="nextrow${isCountryHl(m.ca,m.cb,e.org)?' hl-country':''}"><span class="nextg">${g}</span><span class="nextt">${dualTime(m.date,m.time,offset,true)}</span>
       <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span></div>`).join('');
   // Klick irgendwo im Block soll direkt zum passenden Geschlecht UND zur passenden Phase
   // springen, statt immer zum Herren/aktuelle-Phase-Default — Geschlecht nur eindeutig, wenn
@@ -1148,7 +1192,7 @@ function liveNowHtml(e){
   const rows=live.map(({m,g})=>{
     const cur=(m.sets&&m.sets.length)?m.sets[m.sets.length-1]:null;
     const score=`${m.sa||0}:${m.sb||0}${cur?` <span class="livecur">(${cur[0]}:${cur[1]})</span>`:''}`;
-    return `<div class="nextrow liverow${isCountryHl(m.ca,m.cb)?' hl-country':''}"><span class="livechip"><span class="pulse"></span>Live</span><span class="nextg">${g}</span>
+    return `<div class="nextrow liverow${isCountryHl(m.ca,m.cb,e.org)?' hl-country':''}"><span class="livechip"><span class="pulse"></span>Live</span><span class="nextg">${g}</span>
       <span class="nextteams">${teamFlag(m.ca)}${m.a||'TBD'} – ${teamFlag(m.cb)}${m.b||'TBD'}</span><span class="livescore">${score}</span></div>`;
   }).join('');
   return `<div class="nextup">${rows}</div>`;
@@ -1173,11 +1217,11 @@ function eventRow(e, showNextUp){
       ${rNo?`role="button" tabindex="0" data-idx="${e._idx}" aria-label="${openAria}"`:''}>
       <div class="date">${fmtRange(e.start,e.end)}<b>${MONTHS()[+e.start.slice(5,7)-1].slice(0,3)}</b></div>
       <div class="main">
-        <div class="city"><span class="cityname">${e.city}</span></div>
-        <div class="country"><span class="countryname">${country(e.country)}</span>
-          <span class="badges"><span class="org ${e.org}">${orgLabel(e.org)}</span>
+        <div class="city"><span class="cityname">${e.city}</span><span class="countryname">${country(e.country)}</span></div>
+        <div class="country">
+          <span class="org ${e.org}">${orgLabel(e.org)}</span>
           <span class="tier-badge" style="--tier:${tv}">${e.tier}</span>
-          <span class="gender">${genders||'–'}</span></span>
+          <span class="gender">${genders||'–'}</span>
         </div>
       </div>
       <div class="right">${st}</div>
@@ -1584,12 +1628,12 @@ function renderLastMatches(playerNo){
     // Bei Ausscheiden ist die Kurzform (Runden-Code + Platz) griffiger als der volle Text
     // "Aus: Viertelfinale" — Champion/Bronze/aktiv behalten ihre eigene Bezeichnung.
     const roundText = cls==='out' && lmRound ? `${lmRound} · ${place}. ${t('Platz','place')}` : result;
-    const place2=`${tier?tier+' · ':''}${city}${partner?` · ${t('mit','with')} ${partner}`:''}`;
+    const place2=`${tier?tier+' · ':''}${city}`;
     const detail = lmOpp ? `${t('Letztes Spiel','Last match')}: vs ${teamFlag(lmOppFed)}${lmOpp}${lmScore?` ${lmScore}`:''} · ${place2}` : place2;
     return `<div class="lastm" data-tno="${tno}" data-season="${season}" role="button" tabindex="0"
         aria-label="${t(`Ergebnis ${city} öffnen`,`Open result for ${city}`)}">
       <span class="lm-res ${cls}">${place?`${place}.`:'–'}</span>
-      <span class="lm-date">${date||''}</span>
+      <span class="lm-date">${date||''}${partner?` <span class="lm-partner">· ${partner}</span>`:''}</span>
       <span class="lm-opp">${roundText}</span>
       <span class="lm-city">${detail}</span>
     </div>`;
@@ -2295,7 +2339,7 @@ function matchRowHtml(m, offset, showPhase){
   // als Freilos labeln, kein Score/Aufklappen (es gab ja kein echtes Spiel).
   if(played(m) && (!m.a || !m.b)){
     const team=m.a||m.b, fedc=m.a?m.ca:m.cb;
-    return `<div class="match bye${isCountryHl(m.ca,m.cb)?' hl-country':''}">
+    return `<div class="match bye${isCountryHl(m.ca,m.cb,cur.ev.org)?' hl-country':''}">
       <span class="match-no">#${m.n}</span>
       <div class="mt">${mtLabel}</div>
       <div class="teams">
@@ -2308,7 +2352,7 @@ function matchRowHtml(m, offset, showPhase){
     const A=slotInfo(m,'a'), B=slotInfo(m,'b');
     // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
     const preview = m.a && m.b;
-    let out = `<div class="match sched${preview?' expandable':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Head-to-Head ${m.a} gegen ${m.b}`,`Head-to-head ${m.a} vs ${m.b}`)}"`:''}>
+    let out = `<div class="match sched${preview?' expandable':''}${isCountryHl(m.ca,m.cb,cur.ev.org)?' hl-country':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Head-to-Head ${m.a} gegen ${m.b}`,`Head-to-head ${m.a} vs ${m.b}`)}"`:''}>
       <span class="match-no">#${m.n}</span>
       <div class="mt">${mtLabel}</div>
       <div class="teams">
@@ -2323,7 +2367,7 @@ function matchRowHtml(m, offset, showPhase){
   }
   const live=isLive(m), aWin=!live && +m.sa>+m.sb;
   const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
-  return `<div class="match expandable${live?' inprogress':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}">
+  return `<div class="match expandable${live?' inprogress':''}${isCountryHl(m.ca,m.cb,cur.ev.org)?' hl-country':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}">
     <span class="match-no">#${m.n}</span>
     <div class="mt">${mtLabel}</div>
     <div class="teams">
@@ -2355,16 +2399,26 @@ function renderChronoList(){
   const {matches}=cur;
   const offset=venueOffsetMinutes(cur.ev.country, cur.ev.start);
   const filtered = chronoDay ? matches.filter(m=>m.date===chronoDay) : matches;
-  const sorted=[...filtered].sort((a,b)=>
+  if(!filtered.length) return `<div class="bkt-note">${t('Für dieses Turnier liegen noch keine angesetzten Spiele vor.','No scheduled matches for this tournament yet.')}</div>`;
+  // Noch nicht angesetzte Spiele (keine Uhrzeit UND noch nicht gespielt) unten in einem eigenen
+  // Block statt dazwischen — ein Freilos hat zwar auch keine Uhrzeit, ist aber schon entschieden
+  // (played(m)) und bleibt daher regulaer chronologisch einsortiert, nicht im TBD-Block.
+  const scheduled = filtered.filter(m=>played(m) || m.time);
+  const pending = filtered.filter(m=>!played(m) && !m.time);
+  scheduled.sort((a,b)=>
     (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||'') || a.n-b.n);
-  if(!sorted.length) return `<div class="bkt-note">${t('Für dieses Turnier liegen noch keine angesetzten Spiele vor.','No scheduled matches for this tournament yet.')}</div>`;
+  pending.sort((a,b)=>(a.date||'').localeCompare(b.date||'') || a.n-b.n);
   let out='', curDate='';
-  for(const m of sorted){
+  for(const m of scheduled){
     if(m.date && m.date!==curDate){
       curDate=m.date;
       out += `<div class="dsub">${fmtDate(curDate)}</div>`;
     }
     out += matchRowHtml(m, offset, true);
+  }
+  if(pending.length){
+    out += `<div class="dsub">${t('Ansetzung noch offen','Time not yet set')}</div>`;
+    for(const m of pending) out += matchRowHtml(m, offset, true);
   }
   return out;
 }
@@ -2840,7 +2894,15 @@ document.addEventListener('keydown',e=>{
   else closeDrawer();
 });
 document.getElementById('vtoggle').addEventListener('click',e=>{
-  const b=e.target.closest('.vt'); if(!b||b.hidden)return; setView(b.dataset.view);
+  const b=e.target.closest('.vt'); if(!b||b.hidden)return;
+  // Beim manuellen (Zurueck-)Wechsel zu "Ergebnisse" bei einem laufenden Turnier direkt in die
+  // gerade gespielte Phase springen, statt bei einer laengst vergangenen (z.B. der Vormittags-
+  // Gruppenphase) stehenzubleiben, waehrend das Turnier laengst in der KO-Phase live laeuft.
+  if(b.dataset.view==='list' && cur.ev.status==='live'){
+    listPhase = currentPhase(cur.matches);
+    bracketMode=false;
+  }
+  setView(b.dataset.view);
 });
 document.getElementById('phaseToggle').addEventListener('click',e=>{
   const b=e.target.closest('.vt'); if(!b||b.hidden)return;
