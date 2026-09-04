@@ -347,7 +347,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   /* overflow:visible statt geerbtem overflow-y:auto: .mmodal wuerde sonst jedes
      ueberstehende Element clippen, auch das absolut positionierte Sugg-Dropdown.
      Die Gesamthoehe bleibt durch .h2hCompare .h2list (eigener Scroll) begrenzt. */
-  .h2hmodal{z-index:95;width:min(640px,92vw);max-height:none;overflow:visible;}
+  .h2hmodal{z-index:95;width:min(760px,94vw);max-height:none;overflow:visible;}
   #h2hscrim{z-index:85;}
   .h2hpicker{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;}
   .h2hside{flex:1;min-width:0;position:relative;}
@@ -370,7 +370,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .h2hNote{color:var(--muted);font-size:13.5px;text-align:center;padding:18px 0;}
   .h2hCompare .h2bal{justify-content:center;font-size:15px;}
   .h2hCompare .h2list{max-height:340px;overflow-y:auto;}
-  .h2hCompare .h2r{grid-template-columns:60px 1fr 1fr auto;}
+  .h2hCompare .h2r{grid-template-columns:60px 0.9fr 1.3fr auto;}
   .h2hCompare .h2teams{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .h2hCompare .h2s.lead{color:var(--green);}
   /* Seed im Baum */
