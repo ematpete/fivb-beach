@@ -224,17 +224,28 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
        Gender-Buttons sind rausgewandert) — dafuer lohnt sich keine eigene volle Zeile mehr wie
        frueher (macht die Karte unnoetig hoch), daher wie am Desktop inline in der 3. Spalte. */
     .row{grid-template-columns:56px 1fr auto;}
-    header.top{flex-direction:column;align-items:stretch;}
+    header.top{flex-direction:column;align-items:stretch;position:relative;}
     .hdr-actions{flex-direction:column;align-items:stretch;gap:10px;}
     /* Auf Mobile keine Trennlinien mehr zwischen den Gruppen (wirkt gedrungen) — stattdessen
        eigene, volle Zeilen pro Gruppe mit etwas Abstand; Bedienelemente insgesamt groesser
        fuers Antippen. */
     .hdr-group{padding-right:0;border-right:none;justify-content:center;}
-    .hdr-group-view,.hdr-group-tools{padding-bottom:10px;border-bottom:1px solid var(--line);}
-    #seasonSel,#countrySel{flex:1 1 auto;text-align:center;}
+    .hdr-group-view{padding-bottom:10px;border-bottom:1px solid var(--line);}
+    /* Utility-Gruppe (Reload/Sprache/Theme) raus aus dem normalen Fluss, oben rechts auf Hoehe
+       der h1 plaziert statt als eigene volle Zeile — dezent/klein, da am seltensten gebraucht.
+       Tools ist dadurch jetzt die letzte Zeile im normalen Fluss, braucht daher keinen eigenen
+       Trennstrich mehr (der aeussere Header-Rahmen schliesst direkt danach ab). */
+    .hdr-group-util{position:absolute;top:20px;right:0;gap:4px;}
+    .hdr-group-util .themebtn{padding:6px 9px;font-size:12px;background:transparent;border-color:transparent;color:var(--faint);}
+    .hdr-group-util .themebtn:hover{border-color:var(--line);color:var(--ink);}
+    #seasonSel{flex:1 1 auto;text-align:center;}
     .hdr-group .themebtn{font-size:13.5px;padding:10px 14px;}
     .hdr-group .h2hbtn{flex:1 1 auto;text-align:center;}
-    .genderpref .vt{padding:8px 14px;font-size:13px;}
+    /* M/W soll das breiteste/am leichtesten zu treffende Element in der Gruppe sein — Land
+       dafuer bewusst kompakter und nicht mitwachsend. */
+    .genderpref{flex:1 1 auto;justify-content:center;}
+    .genderpref .vt{flex:1 1 auto;padding:12px 20px;font-size:14.5px;}
+    .hdr-group .countrysel{flex:0 1 auto;font-size:11.5px;padding:8px 10px;}
     #themebtn,#refreshbtn,#langBtn{flex:0 0 auto;padding-left:16px;padding-right:16px;}
     .h2hpicker{flex-direction:column;align-items:stretch;}
     .h2hvs{padding-top:0;text-align:center;}
@@ -288,8 +299,11 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .vt:hover{color:var(--ink);}
   .vt[hidden]{display:none;}
   /* Kompakte Variante fuer den Header (Bevorzugtes Geschlecht) statt der grossen Drawer-Groesse. */
-  .genderpref{margin-top:0;padding:2px;border-radius:9px;}
-  .genderpref .vt{padding:5px 11px;font-size:12px;font-family:var(--mono);font-weight:700;}
+  .genderpref{margin-top:0;padding:3px;border-radius:10px;}
+  .genderpref .vt{padding:8px 18px;font-size:13px;font-family:var(--mono);font-weight:700;}
+  /* Etwas kompakter als die anderen themebtn-Controls daneben, damit fuer den breiteren
+     M/W-Umschalter mehr Platz bleibt — Land ist ohnehin eher ein Nice-to-have als Kernsteuerung. */
+  .countrysel{font-size:11px;padding:7px 9px;}
   /* eigene Zeile unter dem Ansicht-/Geschlecht-Schalter, leicht abgesetzter Farbton */
   .phasetoggle{margin-top:8px;background:color-mix(in srgb,var(--water) 8%,var(--surface-2));
     border-color:color-mix(in srgb,var(--water) 25%,var(--line));}
@@ -763,8 +777,8 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     <div class="vtoggle phasetoggle" id="phaseToggle" role="group" aria-label="Turnierphase" hidden>
       <button class="vt" data-phase="quali" type="button" aria-pressed="false">Quali</button>
       <button class="vt" data-phase="pool" type="button" aria-pressed="false">Pool</button>
-      <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO</button>
-      <button class="vt" data-phase="bracket" type="button" aria-pressed="false">Baum</button>
+      <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO-Liste</button>
+      <button class="vt" data-phase="bracket" type="button" aria-pressed="false">KO-Baum</button>
     </div>
   </header>
   <div id="dChamp"></div>
@@ -891,7 +905,8 @@ function applyStaticI18n(){
   document.querySelector('#vtoggle .vt[data-view="chrono"]').textContent=t('Spielliste','Match list');
   document.querySelector('#vtoggle .vt[data-view="seeds"]').textContent='Teams';
   attr('phaseToggle','aria-label',t('Turnierphase','Phase'));
-  document.querySelector('#phaseToggle .vt[data-phase="bracket"]').textContent=t('Baum','Bracket');
+  document.querySelector('#phaseToggle .vt[data-phase="ko"]').textContent=t('KO-Liste','KO list');
+  document.querySelector('#phaseToggle .vt[data-phase="bracket"]').textContent=t('KO-Baum','KO bracket');
   attr('mmClose','aria-label',t('Schließen','Close'));
   attr('photoLb','aria-label',t('Foto','Photo'));
   attr('photoLbClose','aria-label',t('Schließen','Close'));
