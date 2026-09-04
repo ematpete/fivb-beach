@@ -60,13 +60,26 @@ NOISE_RE = re.compile(
     r"\bTest\b|Training|\bAVC\b|\bCAVB\b|\bNORCECA\b|\bCSVP\b|\bASVBF\b|\bEEVZA\b|\bNEVZA\b|"
     r"African Games|Mediterranean.*Games|SEA Games|\bFISU\b|Commonwealth Games|King of the Court",
     re.I)
+# Innerhalb der CEV-Sparte bewusst milder als NOISE_RE: "CEV Satellite <Ort>"/"CEV Zonal Event
+# <Ort>" waren vor der "CEVP"-Kennung (ab 2023) der Name der regulaeren Erwachsenen-CEV-Tour
+# (Aequivalent zum heutigen "CEV Tour") — mit dem allgemeinen NOISE_RE faelschlich als Rauschen
+# rausgefiltert, obwohl es keine Jugend-/Qualifikationsturniere waren (empirisch an Teamzahlen
+# und fehlenden Alters-Markern verifiziert, z.B. "CEV Zonal Event - Barcelona" 2016, 12 Teams).
+CEV_NOISE_RE = re.compile(
+    r"Snow Tour|Sub[- ]?Zonal|Qualif|Development|Continental Cup|"
+    r"\bTest\b|Training|\bAVC\b|\bCAVB\b|\bNORCECA\b|\bCSVP\b|\bASVBF\b|\bEEVZA\b|\bNEVZA\b|"
+    r"African Games|Mediterranean.*Games|SEA Games|\bFISU\b|Commonwealth Games|King of the Court",
+    re.I)
 # Nationale Verbandstouren (OeVV/DVV): VIS nutzt hier den Laendercode selbst als
 # Code-Praefix statt einer Stadt-Abkuerzung (z.B. "MAUT0526" statt "MHAM2025" fuer eine
 # echte BPT-Stadt) — zuverlaessiges Unterscheidungsmerkmal unabhaengig vom Turniernamen.
-# Aeltere Saisons nutzten dafuer noch Stadt-Codes (nicht unterscheidbar) — bleiben aussen vor.
 # 2023 alleine nutzte nochmal ein eigenes Zwischenformat mit "NT" im Code selbst (z.B.
 # "MAUTNT01" statt "MAUT0123") — ohne das (NT)? fehlte eine komplette Saison ÖVV/DVV-Turniere.
-NATIONAL_TOUR_RE = re.compile(r"^[MW](AUT|GER)(NT)?\d+$")
+# Vor 2023 (mind. bis 2013 zurueck) lief das Ganze nochmal anders: "N"+Land+laufende Nummer
+# statt "M"/"W"+Land (z.B. "NAUT0219" statt "MAUT..."), mit einem eigenen Feld "Gender" pro
+# Eintrag statt zwei parallelen M/W-Codes — s. NATIONAL_TOUR_RE-Nutzung in build_events() fuer
+# die dafuer noetige andere Paarungslogik (Ort+Datum statt gemeinsamer Ziffern nach M/W).
+NATIONAL_TOUR_RE = re.compile(r"^[MWN](AUT|GER)(NT)?\d+$")
 NATIONAL_ORG = {"AUT": "OEVV", "GER": "DVV"}
 NATIONAL_NAME_PREFIX_RE = re.compile(
     r"^(AUT NT|GER NT|GER RTB)\s*-\s*|"
@@ -119,22 +132,31 @@ def classify(name, code="", teams=None, season=None, default_city=""):
             return ("CEV", "CEV Tour", re.sub(r"^CEVP\s*-\s*", "", n).strip())
         # alte CEV-Turnierform (vor 2018): "ECH Final" ist wiederum nur ein weiterer
         # historischer Name derselben Senioren-EM/EuroBeachVolley, "Masters"-Tour explizit,
-        # Rest nur wenn kein Jugend-/Satelliten-/Zonal-Rauschen
+        # Rest nur wenn kein Jugend-Rauschen (Satellite/Zonal Event sind hier bewusst KEIN
+        # Rauschen mehr, s. CEV_NOISE_RE oben)
         if re.search(r"\bECH\b", n) and not AGE_RE.search(n):
             city = re.sub(r"^CEV\s+ECH\s*(Final)?\s*-?\s*", "", n, flags=re.I).strip()
             return ("CEV", "EuroBeach", city or "EuroBeachVolley")
         if re.search(r"\bMasters\b", n, re.I):
             city = re.sub(r"^CEV\s+", "", re.sub(r"\s+Masters\b", "", n, flags=re.I)).strip()
             return ("CEV", "Masters", city)
-        if NOISE_RE.search(n) or AGE_RE.search(n):
+        if CEV_NOISE_RE.search(n) or AGE_RE.search(n):
             return None
-        return ("CEV", "CEV", re.sub(r"^CEV\s+", "", n).strip())
+        city = re.sub(r"^CEV\s+(Satellite\s*-?\s*|Zonal Event\s*-?\s*)?", "", n, flags=re.I).strip()
+        return ("CEV", "CEV", city)
     # MEVZA (Mitteleuropaeische Volleyball-Zonalverbindung: AUT/SUI/SLO/CRO/CZE/HUN/LUX ...) —
-    # nur die Erwachsenen-Turnierserie "Zonal Tour", Jugend-Zonal-Qualis (U18/U20) fallen unten
-    # unter die allgemeine AGE_RE-Ausschlussregel wie bei allen anderen Verbaenden auch.
-    if re.search(r"MEVZA Zonal Tour", n, re.I):
-        city = re.sub(r"^MEVZA\s+Zonal\s+Tour\s+", "", n, flags=re.I).strip()
-        return ("MEVZA", "Zonal Tour", city)
+    # nur die Erwachsenen-Turnierserie, Jugend-Zonal-Qualis (U18/U20) explizit ausgeschlossen.
+    # Der Name selbst hat sich mehrfach geaendert (nur "Zonal Tour" ist die aktuelle ab ~2024er
+    # Form) — aeltere Saisons hiessen "MEVZA - Zonal Event - <Ort>", "MEVZA-Zonal Event-<Ort>"
+    # oder sogar "<Ort> MEVZA Zonal" (Ort vor MEVZA) - alle empirisch gegen echte VIS-Daten
+    # 2014-2020 verifiziert, DefaultCity ist bei diesen Turnieren leer und daher keine Option.
+    if re.search(r"MEVZA", n, re.I) and re.search(r"Zonal", n, re.I) and not AGE_RE.search(n):
+        if re.match(r"MEVZA", n, re.I):
+            city = re.sub(r"^MEVZA\s*-?\s*Zonal\s*(Tour|Event)?\s*-?\s*", "", n, flags=re.I)
+        else:
+            city = re.split(r"MEVZA", n, flags=re.I)[0]
+        city = re.sub(r"\s*/\s*(Men|Women)\s*$", "", city, flags=re.I).strip(" -")
+        return ("MEVZA", "Zonal Tour", city or n.strip())
     # OeVV/DVV-Nationaltouren: erst NACH den BPT/CEV-Namensmustern pruefen, damit ein
     # zufaellig kollidierender Code (z.B. "MGER2025" fuer die echte CEV EuroBeachVolley
     # in Duesseldorf) nicht faelschlich als Nationaltour-Stopp durchrutscht.
@@ -175,7 +197,17 @@ def build_events(tournaments):
         if not cl:
             continue
         org, tier, city = cl
-        base = t["Code"][1:] if t["Code"][:1] in "MW" else t["Code"]
+        code = t["Code"]
+        if code[:1] in "MW":
+            base = code[1:]
+        elif code[:1] == "N":
+            # Aeltere OeVV/DVV-Nationaltour-Saisons (vor 2023) nutzen ein "N"+Land-Praefix mit
+            # fortlaufender, pro Geschlecht getrennter Nummer statt gemeinsamer Ziffern nach
+            # M/W (z.B. "NAUT0219"/"NAUT0319" fuer denselben Innsbruck-Stopp) — die Ziffern
+            # selbst taugen hier also nicht als Paarungsschluessel, Ort+Datum schon.
+            base = f"N|{t['Name'].strip()}|{t['StartDateMainDraw']}"
+        else:
+            base = code
         g = groups.setdefault(base, {
             "org": org, "tier": tier, "city": city, "country": clean_country(t["CountryName"]),
             "start": t["StartDateMainDraw"], "end": t["EndDateMainDraw"], "M": None, "W": None})
