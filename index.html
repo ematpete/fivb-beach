@@ -279,7 +279,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     border-radius:8px;padding:3px 9px;cursor:pointer;letter-spacing:.03em;}
   .livebtn:hover:not(:disabled){background:color-mix(in srgb,var(--water) 10%,transparent);}
   .livebtn:disabled{opacity:.6;cursor:default;}
-  .vtoggle{display:inline-flex;margin-top:12px;background:var(--surface-2);border:1px solid var(--line);
+  .vtoggle{display:inline-flex;flex-wrap:wrap;margin-top:12px;background:var(--surface-2);border:1px solid var(--line);
     border-radius:12px;padding:4px;gap:4px;}
   .vtoggle[hidden]{display:none;}
   .vt{font-family:var(--sans);font-size:14px;font-weight:600;color:var(--muted);background:none;
@@ -754,8 +754,8 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
         <button class="vt" data-g="W" type="button" aria-pressed="false">Damen</button>
       </div>
       <div class="vtoggle" id="vtoggle" role="group" aria-label="Ansicht">
-        <button class="vt" data-view="list" type="button" aria-pressed="true">Liste</button>
-        <button class="vt" data-view="bracket" type="button" aria-pressed="false">Baum</button>
+        <button class="vt" data-view="list" type="button" aria-pressed="true">Ergebnisse</button>
+        <button class="vt" data-view="chrono" type="button" aria-pressed="false">Spielliste</button>
         <button class="vt" data-view="seeds" type="button" aria-pressed="false">Teams</button>
         <button class="vt" data-view="ranking" type="button" aria-pressed="false">Ranking</button>
       </div>
@@ -764,6 +764,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
       <button class="vt" data-phase="quali" type="button" aria-pressed="false">Quali</button>
       <button class="vt" data-phase="pool" type="button" aria-pressed="false">Pool</button>
       <button class="vt" data-phase="ko" type="button" aria-pressed="true">KO</button>
+      <button class="vt" data-phase="bracket" type="button" aria-pressed="false">Baum</button>
     </div>
   </header>
   <div id="dChamp"></div>
@@ -886,10 +887,11 @@ function applyStaticI18n(){
   document.querySelector('#genderToggle .vt[data-g="M"]').textContent=t('Herren','Men');
   document.querySelector('#genderToggle .vt[data-g="W"]').textContent=t('Damen','Women');
   attr('vtoggle','aria-label',t('Ansicht','View'));
-  document.querySelector('#vtoggle .vt[data-view="list"]').textContent=t('Liste','List');
-  document.querySelector('#vtoggle .vt[data-view="bracket"]').textContent=t('Baum','Bracket');
+  document.querySelector('#vtoggle .vt[data-view="list"]').textContent=t('Ergebnisse','Results');
+  document.querySelector('#vtoggle .vt[data-view="chrono"]').textContent=t('Spielliste','Match list');
   document.querySelector('#vtoggle .vt[data-view="seeds"]').textContent='Teams';
   attr('phaseToggle','aria-label',t('Turnierphase','Phase'));
+  document.querySelector('#phaseToggle .vt[data-phase="bracket"]').textContent=t('Baum','Bracket');
   attr('mmClose','aria-label',t('Schließen','Close'));
   attr('photoLb','aria-label',t('Foto','Photo'));
   attr('photoLbClose','aria-label',t('Schließen','Close'));
@@ -1673,7 +1675,10 @@ const slotText = S => S.feeder
   ? `<span class="feedref">${S.name}</span>${S.sub?`<span class="feedteams"> ${S.sub}</span>`:''}`
   : `${teamFlag(S.fed)}${S.name}${seedTag(S.seed)}`;
 
-let cur=null, drawerView='list', listPhase='ko';
+// bracketMode: innerhalb der KO-Phase Baum statt flacher Liste zeigen — kein eigener
+// Ansicht-Tab mehr, sondern Teil der Phasen-Unterfilterung (Quali/Pool/KO/Baum), da der Baum
+// ohnehin nur die KO-Phase in anderer Darstellung ist.
+let cur=null, drawerView='list', listPhase='ko', bracketMode=false;
 
 // Direktabruf beim FIVB VIS (CORS-offen) — umgeht den bis zu 20-minütigen Cache von data/<jahr>.json,
 // baut dieselbe Match-Struktur wie generate.py's get_matches() nach.
@@ -1871,19 +1876,26 @@ function updateDrawerContent(){
   gt.hidden = !(mNo && wNo);
   gt.querySelectorAll('.vt').forEach(b=>b.setAttribute('aria-pressed', b.dataset.g===g));
 
-  document.querySelector('#vtoggle .vt[data-view="bracket"]').hidden = !bracketOK;
-  if(!bracketOK && drawerView==='bracket') drawerView='list';
+  cur.bracketOK = bracketOK;
+  if(!bracketOK) bracketMode=false;  // z.B. nach Live-Refresh, falls die Annahme QF/SF+1 Finale nicht mehr zutrifft
 
-  // Phasen-Umschalter (Quali/Pool/KO): Knoepfe ein-/ausblenden je nachdem, was es ueberhaupt
+  // Phasen-Umschalter (Quali/Pool/KO/Baum): Knoepfe ein-/ausblenden je nachdem, was es ueberhaupt
   // gibt, und die aktuell gewaehlte Phase auf eine verfuegbare umschwenken, falls sie (z.B. nach
   // einem Live-Refresh) nicht mehr existiert. Die eigentliche Auswahl selbst bleibt sonst
   // unangetastet, damit ein stiller Hintergrund-Refresh die Nutzerwahl nicht zuruecksetzt.
+  // "Baum" ist kein eigener Phasen-Wert, sondern eine alternative Darstellung der KO-Phase.
   cur.avail = availablePhases(matches);
   if(!cur.avail[listPhase]) listPhase = cur.avail.ko ? 'ko' : cur.avail.pool ? 'pool' : cur.avail.quali ? 'quali' : 'ko';
   const pt=document.getElementById('phaseToggle');
   pt.querySelectorAll('.vt').forEach(b=>{
-    b.hidden = !cur.avail[b.dataset.phase];
-    b.setAttribute('aria-pressed', b.dataset.phase===listPhase);
+    const ph=b.dataset.phase;
+    if(ph==='bracket'){
+      b.hidden = !bracketOK;
+      b.setAttribute('aria-pressed', listPhase==='ko' && bracketMode);
+    } else {
+      b.hidden = !cur.avail[ph];
+      b.setAttribute('aria-pressed', listPhase===ph && !(ph==='ko' && bracketMode));
+    }
   });
 }
 // offene Match-Details vor einem Neu-Render merken und danach wiederherstellen
@@ -1917,9 +1929,10 @@ function openDrawer(ev,gender,phase){
   cur={no,city:ev.city,tier:ev.tier,org:ev.org,matches,byN,ev,gender:g,mNo,wNo};
   if(ev.status==='upcoming') drawerView='seeds';
   // Ein explizit uebergebenes phase (z.B. Klick auf "Als Naechstes") soll auch wirklich in der
-  // Listenansicht landen, sonst waere die Phase unsichtbar, falls zuvor Baum/Teams/Ranking offen war.
+  // Ergebnis-Ansicht landen, sonst waere die Phase unsichtbar, falls zuvor Spielliste/Teams/Ranking offen war.
   if(phase) drawerView='list';
   listPhase = phase || currentPhase(matches);
+  bracketMode=false;  // jedes neu geoeffnete Turnier startet flach, nicht im Baum
 
   updateDrawerContent();
   setView(drawerView);
@@ -2125,9 +2138,10 @@ document.getElementById('genderToggle').addEventListener('click',e=>{
 function setView(v){
   drawerView=v;
   document.querySelectorAll('#vtoggle .vt').forEach(b=>b.setAttribute('aria-pressed', b.dataset.view===v));
-  drawer.classList.toggle('wide', v==='bracket');
+  const showBracket = v==='list' && listPhase==='ko' && bracketMode && cur.bracketOK;
+  drawer.classList.toggle('wide', showBracket);
   const availCount = cur.avail ? Object.values(cur.avail).filter(Boolean).length : 0;
-  document.getElementById('phaseToggle').hidden = v!=='list' || availCount<2;
+  document.getElementById('phaseToggle').hidden = v!=='list' || (availCount<2 && !cur.bracketOK);
   const body=document.getElementById('dBody');
   if(v==='ranking'){
     const no=cur.no, matches=cur.matches;
@@ -2170,7 +2184,12 @@ function setView(v){
     body.scrollTop=0;
     return;
   }
-  body.innerHTML = v==='bracket' ? renderBracket() : renderList(listPhase);
+  if(v==='chrono'){
+    body.innerHTML = renderChronoList();
+    body.scrollTop=0;
+    return;
+  }
+  body.innerHTML = showBracket ? renderBracket() : renderList(listPhase);
   body.scrollTop=0;
 }
 
@@ -2243,6 +2262,61 @@ function poolWaveOf(groupCodes, matches){
   return waveByRc;
 }
 
+// Eine einzelne Match-Zeile (+ ihr zugeklapptes Detail) — von renderList() (gruppiert nach
+// Runde/Pool) UND renderChronoList() (flache Datums-Reihenfolge) gemeinsam genutzt.
+function matchRowHtml(m, offset){
+  const time=dualTime(m.date,m.time,offset,true);
+  const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}`;
+  if(!played(m)){
+    const A=slotInfo(m,'a'), B=slotInfo(m,'b');
+    // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
+    const preview = m.a && m.b;
+    let out = `<div class="match sched${preview?' expandable':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Head-to-Head ${m.a} gegen ${m.b}`,`Head-to-head ${m.a} vs ${m.b}`)}"`:''}>
+      <span class="match-no">#${m.n}</span>
+      <div class="mt">${mtLabel}</div>
+      <div class="teams">
+        <div class="team ${A.feeder?'feeder':''}"><span class="tn">${slotText(A)}</span><span></span><span class="pt">–</span></div>
+        <div class="team ${B.feeder?'feeder':''}"><span class="tn">${slotText(B)}</span><span></span><span class="pt">–</span></div>
+      </div>
+      ${preview?'<span class="mchev">›</span>':''}
+    </div>`;
+    if(preview) out += `<div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
+    return out;
+  }
+  const live=isLive(m), aWin=!live && +m.sa>+m.sb;
+  const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
+  return `<div class="match expandable${live?' inprogress':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}">
+    <span class="match-no">#${m.n}</span>
+    <div class="mt">${mtLabel}</div>
+    <div class="teams">
+      ${liveTag}
+      <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}</span>${setline(m,0)}<span class="pt">${m.sa??'–'}</span></div>
+      <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}</span>${setline(m,1)}<span class="pt">${m.sb??'–'}</span></div>
+    </div>
+    <span class="mchev">›</span>
+  </div>
+  <div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
+}
+// "Spielliste": alle Matches des Turniers unabhaengig von Runde/Pool/Baum rein chronologisch
+// nach Datum/Uhrzeit, wie bei einem Wettanbieter — nur nach Tag gruppiert (Lesbarkeit), sonst
+// keine Struktur/Gruppierung nach Turnierrunde.
+function renderChronoList(){
+  const {matches}=cur;
+  const offset=venueOffsetMinutes(cur.ev.country, cur.ev.start);
+  const sorted=[...matches].sort((a,b)=>
+    (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||'') || a.n-b.n);
+  if(!sorted.length) return `<div class="bkt-note">${t('Für dieses Turnier liegen noch keine angesetzten Spiele vor.','No scheduled matches for this tournament yet.')}</div>`;
+  let out='', curDate='';
+  for(const m of sorted){
+    if(m.date && m.date!==curDate){
+      curDate=m.date;
+      out += `<div class="dsub">${fmtDate(curDate)}</div>`;
+    }
+    out += matchRowHtml(m, offset);
+  }
+  return out;
+}
+
 function renderList(phase){
   const {matches}=cur;
   const offset=venueOffsetMinutes(cur.ev.country, cur.ev.start);
@@ -2262,39 +2336,7 @@ function renderList(phase){
     const tick = isPool(rc) ? `<span class="pooltick" style="background:${POOL_COLORS[(rc.charCodeAt(1)-65)%POOL_COLORS.length]}"></span>` : '';
     out += `<div class="dsub">${tick}${roundLabel(rc,rn)}</div>`;
     if(isPool(rc)) out += renderPoolStandings(rm, matches);
-    for(const m of rm){
-      const time=dualTime(m.date,m.time,offset,true);
-      const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}`;
-      if(!played(m)){
-        const A=slotInfo(m,'a'), B=slotInfo(m,'b');
-        // beide Teams schon bekannt (kein offener Zubringer-Platz) -> anklickbar fuer H2H-Vorschau
-        const preview = m.a && m.b;
-        out += `<div class="match sched${preview?' expandable':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}"${preview?` data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Head-to-Head ${m.a} gegen ${m.b}`,`Head-to-head ${m.a} vs ${m.b}`)}"`:''}>
-          <span class="match-no">#${m.n}</span>
-          <div class="mt">${mtLabel}</div>
-          <div class="teams">
-            <div class="team ${A.feeder?'feeder':''}"><span class="tn">${slotText(A)}</span><span></span><span class="pt">–</span></div>
-            <div class="team ${B.feeder?'feeder':''}"><span class="tn">${slotText(B)}</span><span></span><span class="pt">–</span></div>
-          </div>
-          ${preview?'<span class="mchev">›</span>':''}
-        </div>`;
-        if(preview) out += `<div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
-        continue;
-      }
-      const live=isLive(m), aWin=!live && +m.sa>+m.sb;
-      const liveTag = live ? `<span class="livechip"><span class="pulse"></span>Live</span>` : '';
-      out += `<div class="match expandable${live?' inprogress':''}${isCountryHl(m.ca,m.cb)?' hl-country':''}" data-n="${m.n}" role="button" tabindex="0" aria-expanded="false" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}">
-        <span class="match-no">#${m.n}</span>
-        <div class="mt">${mtLabel}</div>
-        <div class="teams">
-          ${liveTag}
-          <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}</span>${setline(m,0)}<span class="pt">${m.sa??'–'}</span></div>
-          <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}</span>${setline(m,1)}<span class="pt">${m.sb??'–'}</span></div>
-        </div>
-        <span class="mchev">›</span>
-      </div>
-      <div class="mdetail" data-for="${m.n}" hidden>${buildMatchDetail(m)}</div>`;
-    }
+    for(const m of rm) out += matchRowHtml(m, offset);
     return out;
   };
 
@@ -2735,8 +2777,12 @@ document.getElementById('vtoggle').addEventListener('click',e=>{
 });
 document.getElementById('phaseToggle').addEventListener('click',e=>{
   const b=e.target.closest('.vt'); if(!b||b.hidden)return;
-  listPhase=b.dataset.phase;
-  document.querySelectorAll('#phaseToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  if(b.dataset.phase==='bracket'){ listPhase='ko'; bracketMode=true; }
+  else { listPhase=b.dataset.phase; bracketMode=false; }
+  document.querySelectorAll('#phaseToggle .vt').forEach(x=>{
+    const ph=x.dataset.phase;
+    x.setAttribute('aria-pressed', ph==='bracket' ? (listPhase==='ko'&&bracketMode) : (listPhase===ph && !(ph==='ko'&&bracketMode)));
+  });
   setView('list');
 });
 // Match aufklappen (Detail: Satz-für-Satz, Dauer, Schiris …)
