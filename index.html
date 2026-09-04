@@ -949,11 +949,16 @@ const ORG_TIER_GROUPS = {
     {key:'RockTheBeach', label:'Rock the Beach', tiers:['Rock the Beach'], def:true},
   ],
 };
-// Rohtier -> Chip-Gruppenschluessel, ueber alle Verbaende hinweg (render() filtert vorher schon
-// auf den gewaehlten Verband, daher reicht eine einzige globale Zuordnung ohne Ueberschneidungen).
-const TIER_TO_GROUP={};
-for(const groups of Object.values(ORG_TIER_GROUPS)) for(const g of groups) for(const t of g.tiers) TIER_TO_GROUP[t]=g.key;
-const tierGroup = t => TIER_TO_GROUP[t] || null;
+// Rohtier -> Chip-Gruppenschluessel, je Verband gesucht (NICHT global): Verbaende ohne eigenen
+// ORG_TIER_GROUPS-Eintrag (z.B. OEVV, das denselben Rohtier-Wert "National" wie DVV nutzt, aber
+// selbst keine Stufenchips hat) wuerden sonst faelschlich den Chip-Gruppenschluessel eines
+// ANDEREN Verbands erben und ihre Turniere landeten dadurch komplett unsichtbar im Filter
+// (echter Bug: ÖVV-Turniere verschwanden, weil "National" ueber DVV global belegt war).
+const tierGroup = (tier, org) => {
+  const groups=ORG_TIER_GROUPS[org]||[];
+  const g=groups.find(g=>g.tiers.includes(tier));
+  return g ? g.key : null;
+};
 // Stufen-Chips fuer den aktuell gewaehlten Verband neu aufbauen (Label + Default-Zustand) —
 // beim Verbandswechsel wird die Auswahl bewusst zurueckgesetzt, nicht uebernommen, da die
 // Chip-Schluessel zwischen Verbaenden nichts miteinander zu tun haben.
@@ -1060,7 +1065,7 @@ function dualTime(date, time, offsetMin, compact){
   // nicht auffindbar ist) — die erste Zeit ist immer implizit "deine", die zweite klein mit
   // einer Pin-Nadel statt Textlabel markiert (kurz genug fuer die schmale Spalte, aber eindeutig).
   return compact
-    ? `<span class="t-user">${userTime}</span><span class="t-venue" title="${t('Ortszeit','Local time')}">${PIN_ICON}${hhmm}</span>`
+    ? `<span class="t-user">${userTime}</span><span class="t-venue" title="${t('Ortszeit','Local time')}">(${PIN_ICON}${hhmm})</span>`
     : `<span class="t-user">${userTime}</span> <span class="tz-note" title="${t('Ortszeit','Local time')}">(${PIN_ICON}${hhmm})</span>`;
 }
 function nextUpMatches(ev, limit=2){
@@ -1157,7 +1162,7 @@ function render(){
     // im "Live jetzt"-Pin ohnehin immer sichtbar, sollen aber nicht doppelt auftauchen,
     // wenn sie durch den aktuellen Filter eigentlich rausfallen wuerden.
     if(state.org!=='all' && e.org!==state.org) return false;
-    const grp=tierGroup(e.tier);
+    const grp=tierGroup(e.tier, e.org);
     if(grp && !state.tiers[grp]) return false;
     return true;
   });
@@ -1172,7 +1177,7 @@ function render(){
   // "live" aufblitzen, bevor der Hintergrund-Refresh die echten Daten nachlaedt.
   const todayStr = new Date().toISOString().slice(0,10);
   const liveNow = DATA.events.filter(e=>e.status==='live' && e.end>=todayStr)
-    .sort((a,b)=>(LIVE_TIER_ORDER[tierGroup(a.tier)]??3)-(LIVE_TIER_ORDER[tierGroup(b.tier)]??3));
+    .sort((a,b)=>(LIVE_TIER_ORDER[tierGroup(a.tier,a.org)]??3)-(LIVE_TIER_ORDER[tierGroup(b.tier,b.org)]??3));
   if(liveNow.length){
     html += `<div class="livepin"><div class="livepin-lab"><span class="pulse"></span>${t('Live jetzt','Live now')}</div>`
       + `<div class="list">${liveNow.map(e=>eventRow(e,true)).join('')}</div></div>`;
@@ -2121,9 +2126,15 @@ function poolStandings(rm, allMatches){
   const get=(nm,fedc)=>{ const e=teams[nm] || (teams[nm]={name:nm,fed:null,w:0,l:0,sw:0,sl:0,pw:0,pl:0}); if(fedc) e.fed=fedc; return e; };
   for(const m of rm){
     if(!isFinished(m)) continue;
-    const A=get(m.a,m.ca), B=get(m.b,m.cb), aWin=+m.sa>+m.sb;
+    // Ein echtes Walkover ohne jede erfasste Punktzahl (weder sa/sb noch Saetze — VIS markiert
+    // es trotzdem als beendet) wuerde hier via +undefined=NaN die komplette Satz-/Punktbilanz
+    // des Teams fuer den Rest der Tabelle verseuchen ("NaN" in der Spalte) — solche Matches
+    // fuer die Zaehlung einfach ueberspringen, da sich der Sieger ohnehin nicht ableiten laesst.
+    const sa=+m.sa, sb=+m.sb;
+    if(Number.isNaN(sa) || Number.isNaN(sb)) continue;
+    const A=get(m.a,m.ca), B=get(m.b,m.cb), aWin=sa>sb;
     if(aWin){A.w++; B.l++;} else {B.w++; A.l++;}
-    A.sw+=+m.sa; A.sl+=+m.sb; B.sw+=+m.sb; B.sl+=+m.sa;
+    A.sw+=sa; A.sl+=sb; B.sw+=sb; B.sl+=sa;
     for(const s of (m.sets||[])){ A.pw+=s[0]; A.pl+=s[1]; B.pw+=s[1]; B.pl+=s[0]; }
   }
   const rows=Object.values(teams).sort((x,y)=>
@@ -2581,8 +2592,12 @@ function renderDoubleKO(matches, repechageCodes){
     return `<div class="rnd"><div class="rlab">${roundLabel(rc,ms[0].rn)}</div><div class="cells">`
       + ms.map(m=>`<div class="cell">${bracketBox(m)}</div>`).join('') + `</div></div>`;
   };
+  // isQuali/isPool ausschliessen wie schon bei der repechageCodes-Erkennung oben — sonst
+  // rutschen Gruppen-/Quali-Runden als eigene Spalten mit in den Baum (z.B. bei der CEV-
+  // Jugend-EM: "LQF"/"Loser Quarterfinals" triggert hier Doppel-KO, ohne den Ausschluss waeren
+  // dann auch alle acht Pool-Runden als Baum-Spalten aufgetaucht — viel zu voll).
   const mainCodes=[...new Set(matches.map(m=>m.rc))]
-    .filter(rc=>!['F1','SF','F3','BM'].includes(rc) && !repechageCodes.includes(rc))
+    .filter(rc=>!['F1','SF','F3','BM'].includes(rc) && !repechageCodes.includes(rc) && !isQuali(rc) && !isPool(rc))
     .sort((a,b)=>rrOf(b)-rrOf(a));  // fruehste/flachste Runde zuerst -> ganz links
   const repSorted=repechageCodes.slice().sort((a,b)=>rrOf(a)-rrOf(b));  // tiefste (naeher am Halbfinale) zuerst -> naeher an der Mitte
   // Finale zwischen die beiden Halbfinal-Boxen setzen (nicht darunter) — jede Box mit
