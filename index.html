@@ -2233,6 +2233,12 @@ function buildSeedList(matches){
   const rows=[...teams.values()].map(tm=>{
     let best=null, bestRank=Infinity;
     const cameFromQuali = tm.matches.some(({m})=>macroOf(m.rc,m.rn)==='quali');
+    // Ein Team, das durch die Quali kam UND ins Hauptfeld nachgerueckt ist, soll im Hauptfeld-
+    // Abschnitt stehen (dort spielt es gerade), nicht im Quali-Abschnitt — sonst faellt es aus
+    // der Setzliste des Hauptfelds komplett raus, sobald es auch nur ein Quali-Match hatte.
+    const hasMainDrawMatch = tm.matches.some(({m})=>macroOf(m.rc,m.rn)!=='quali');
+    const entryKey = hasMainDrawMatch ? 'main' : 'quali';
+    const fromQuali = cameFromQuali && hasMainDrawMatch;
     for(const {m,side} of tm.matches){
       if(!isFinished(m)) continue;
       const rank=roundRank(m.rc,m.rn);
@@ -2258,7 +2264,7 @@ function buildSeedList(matches){
         else { result=t(`Aus: ${roundLabel(m.rc,m.rn)}`,`Out: ${roundLabel(m.rc,m.rn)}`); cls='out'; }
       }
     }
-    return {...tm, result, cls, entry: cameFromQuali ? 'Quali' : t('Hauptfeld','Main draw'), bestRank, lastMatch: best};
+    return {...tm, result, cls, entryKey, fromQuali, bestRank, lastMatch: best};
   });
   rows.sort((a,b)=>(a.seed||999)-(b.seed||999) || a.name.localeCompare(b.name));
   return rows;
@@ -2283,21 +2289,29 @@ const POINTS_BREAKDOWN_CAVEAT = () => t(
 function renderSeedList(pointsByKey){
   const rows=buildSeedList(cur.matches);
   if(!rows.length) return null;  // kein echter Draw vorhanden — setView faellt auf die Meldeliste zurueck
-  const trs=rows.map(sr=>{
+  const rowHtml=sr=>{
     const pts = pointsByKey && pointsByKey[seedKey(sr.p1no,sr.p2no)];
     const ptsCell = pts!=null
       ? `<span class="pts-click" role="button" tabindex="0" data-p1no="${sr.p1no||''}" data-p2no="${sr.p2no||''}"
           data-team="${sr.name.replace(/"/g,'&quot;')}" aria-label="${t('Punkte-Aufschlüsselung','Points breakdown')} ${sr.name}">${pts}</span>`
       : '–';
-    return `<tr><td class="pos">${sr.seed||'–'}</td><td class="nm">${sr.name} ${fed(sr.fed)}</td>
-    <td class="entry">${sr.entry}</td><td class="n">${ptsCell}</td><td class="seedres ${sr.cls}">${sr.result}</td></tr>`;
+    return `<tr><td class="pos">${sr.seed||'–'}</td><td class="nm">${sr.name} ${fed(sr.fed)}
+      ${sr.fromQuali?`<span class="qbadge" title="${t('Aus der Qualifikation nachgerückt','Advanced from qualification')}">Q</span>`:''}</td>
+    <td class="n">${ptsCell}</td><td class="seedres ${sr.cls}">${sr.result}</td></tr>`;
+  };
+  // Gleiche Abschnittsgliederung (Hauptfeld/Qualifikation) wie in der vorlaeufigen Meldeliste
+  // (renderEntryTiers), damit die Darstellung nicht plötzlich anders aussieht, sobald der
+  // echte Draw feststeht — vorher landete hier alles in einer einzigen flachen Tabelle.
+  const sections=ENTRY_SECTIONS.filter(([key])=>rows.some(r=>r.entryKey===key)).map(([key,label])=>{
+    const items=rows.filter(r=>r.entryKey===key);
+    return `<div class="entrysection"><div class="dsub">${t(...label)} <span class="entrycount">(${items.length})</span></div>
+      <table class="standings"><thead><tr><th class="n">${t('Setzung','Seed')}</th><th>Team</th>
+      <th class="n">${t('Punkte (Setzung)','Points (seeding)')}</th><th>${t('Stand','Status')}</th></tr></thead>
+      <tbody>${items.map(rowHtml).join('')}</tbody></table></div>`;
   }).join('');
   // Ein echter Draw existiert per Definition erst nach der Setzung — hier also immer die
   // Setzungspunkte zeigen, nicht die (laengst ueberholten) Einstiegspunkte vom Meldeschluss.
-  return `<table class="standings"><thead><tr><th class="n">${t('Setzung','Seed')}</th><th>Team</th><th>${t('Start','Entry')}</th>
-    <th class="n">${t('Punkte (Setzung)','Points (seeding)')}</th><th>${t('Stand','Status')}</th></tr></thead>
-    <tbody>${trs}</tbody></table>
-    <p class="bkt-note">${POINTS_RULE_NOTE()}</p>`;
+  return sections + `<p class="bkt-note">${POINTS_RULE_NOTE()}</p>`;
 }
 // Vorlaeufige Team-Liste (Hauptfeld/Quali/Reserve/Abgemeldet) aus allen gemeldeten Teams,
 // solange FIVB noch keinen echten Draw mit Setzliste veroeffentlicht hat. Einteilung ueber die
