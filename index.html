@@ -200,9 +200,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .row .reslabel{font-family:var(--sans);font-size:11.5px;font-weight:600;color:var(--accent);
     display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
   @media (max-width:560px){
-    .row{grid-template-columns:56px 1fr;}
-    .right{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;
-      padding-left:62px;margin-top:2px;}
+    /* .right enthaelt seit Kurzem nur noch die Status-Badge (Ergebnisse/Setzliste-Label und
+       Gender-Buttons sind rausgewandert) — dafuer lohnt sich keine eigene volle Zeile mehr wie
+       frueher (macht die Karte unnoetig hoch), daher wie am Desktop inline in der 3. Spalte. */
+    .row{grid-template-columns:56px 1fr auto;}
     header.top{flex-direction:column;align-items:stretch;}
     .hdr-actions{gap:8px;}
     .hdr-actions .stand{order:1;flex:1 0 100%;text-align:center;margin-top:2px;}
@@ -216,7 +217,11 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     .h2hCompare .h2c{grid-area:c;}
     .h2hCompare .h2teams{grid-area:t;white-space:normal;}
     .mmodal{width:min(94vw,440px)!important;padding:18px 16px 16px;}
-    .drawer .dclose{width:42px;height:42px;font-size:19px;}
+    .drawer .dclose{width:48px;height:48px;font-size:21px;}
+    /* Team-Namen nebeneinander braucht Platz, den ein schmales Handy nicht hat — dort bei der
+       bisherigen gestapelten Anordnung bleiben. */
+    .mdetail .mdhead{display:flex;flex-direction:column;gap:4px;}
+    .mdhead-team:first-of-type{justify-content:flex-start;text-align:left;}
   }
   .empty{text-align:center;color:var(--faint);padding:50px 0;font-size:14px;}
 
@@ -529,26 +534,39 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .mdetail{margin:0 0 10px 44px;padding:12px 14px;background:var(--surface-2);
     border:1px solid var(--line);border-radius:10px;}
   .mdetail[hidden]{display:none;}
-  .mdetail .mdhead{display:flex;flex-direction:column;gap:4px;font-size:13px;
-    color:var(--ink);margin-bottom:10px;}
+  /* Desktop: Teams nebeneinander ("Team A  vs  Team B") statt gestapelt, damit sich die
+     Satzergebnisse unten links/rechts direkt zuordnen lassen. Live-Chip als eigene Zeile
+     darueber (grid-column:1/-1), sonst wuerde er die erste Team-Spalte belegen. */
+  .mdetail .mdhead{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px 10px;
+    font-size:13px;color:var(--ink);margin-bottom:10px;}
+  .mdhead .livechip{grid-column:1/-1;}
   .mdhead-team{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;}
+  .mdhead-team:first-of-type{justify-content:flex-end;text-align:right;}
   .mdhead-vs{font-family:var(--mono);font-size:10px;color:var(--faint);
-    text-transform:uppercase;letter-spacing:.08em;}
+    text-transform:uppercase;letter-spacing:.08em;justify-self:center;}
   .fed{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 5px;
     border-radius:4px;border:1px solid var(--line);color:var(--muted);
     display:inline-flex;align-items:center;gap:4px;}
   .fed .flag{font-size:11px;line-height:1;}
   .team-flag{margin-right:4px;font-size:0.92em;}
-  .mdetail .setgrid{display:grid;grid-template-columns:auto 1fr auto;gap:5px 14px;align-items:baseline;
-    font-variant-numeric:tabular-nums;}
+  /* 5 statt 3 Spalten: Satzlabel | Score A | ":" | Score B | Dauer — Score A/B liegen damit
+     unter den jeweiligen Team-Spalten im Kopf oben. */
+  .mdetail .setgrid{display:grid;grid-template-columns:auto 1fr auto 1fr auto;gap:5px 8px;
+    align-items:baseline;font-variant-numeric:tabular-nums;}
   .mdetail .sk{font-family:var(--mono);font-size:11px;color:var(--faint);}
   .mdetail .ssc{font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:.02em;}
+  .mdetail .ssc-a{text-align:right;}
+  .mdetail .ssc-b{text-align:left;}
+  .mdetail .ssc-sep{font-family:var(--mono);color:var(--faint);font-size:12px;}
   .mdetail .ssc .lo{color:var(--faint);font-weight:400;}
   .mdetail .sdur{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:right;}
   .mdetail .sdur::before{content:"⏱ ";opacity:.5;}
-  .mdetail .setgrid .tot{border-top:1px solid var(--line);padding-top:5px;margin-top:2px;
-    align-self:center;}
-  .mdetail .tot.sk{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:10px;}
+  /* Eigene Flex-Zeile statt Grid-Zellen mit border-top: eine leere Grid-Zelle hat keine
+     Text-Baseline, wodurch die Trennlinie zuvor sichtbar gegenueber den Satz-Zeilen verrutscht ist. */
+  .mdetail .tot-row{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;
+    border-top:1px solid var(--line);padding-top:6px;margin-top:3px;}
+  .mdetail .tot-row .sk{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:10px;}
+  .mdetail .tot-row .sdur{font-size:11.5px;}
   /* Basis-Layout gilt ueberall wo .mdmeta genutzt wird (Match-Detail UND Spielerprofil);
      der obere Trennstrich nur im Match-Detail, wo davor bereits andere Inhalte stehen. */
   .mdmeta{display:flex;flex-direction:column;gap:5px;font-size:12px;}
@@ -1442,17 +1460,22 @@ document.getElementById('pmBody').addEventListener('click', e=>{
 function buildMatchDetail(m){
   const V = DATA.venues[cur.no] || {};
   const live = isLive(m);
+  // Satz-Score in zwei eigene Zellen (statt einem "12 : 21"-Textblock) aufgeteilt, damit sie
+  // sich links/rechts mit den Team-Spalten im Kopf oben decken — sonst muss man erst zum Kopf
+  // hochschauen, um zu wissen, welche Zahl zu welchem Team gehoert.
   const setg = (m.sets||[]).map((s,i)=>{
     const curSet = live && i===m.sets.length-1;  // laufender Satz: noch kein Ergebnis, nur Zwischenstand
     const aw = !curSet && s[0]>s[1];
     const scoreA = curSet ? `${s[0]}` : (aw ? `${s[0]}` : `<span class="lo">${s[0]}</span>`);
     const scoreB = curSet ? `${s[1]}` : (!aw ? `${s[1]}` : `<span class="lo">${s[1]}</span>`);
     const dur=(m.d&&m.d[i])?`<div class="sdur">${fmtDur(m.d[i])} min</div>`:`<div class="sdur">${curSet?t('läuft','in progress'):''}</div>`;
-    return `<div class="sk${curSet?' live':''}">${t('Satz','Set')} ${i+1}</div><div class="ssc${curSet?' live':''}">${scoreA} : ${scoreB}</div>${dur}`;
+    return `<div class="sk${curSet?' live':''}">${t('Satz','Set')} ${i+1}</div>
+      <div class="ssc ssc-a${curSet?' live':''}">${scoreA}</div><div class="ssc-sep">:</div><div class="ssc ssc-b${curSet?' live':''}">${scoreB}</div>${dur}`;
   }).join('');
   const totalD=(m.d||[]).reduce((a,x)=>a+(x||0),0);
-  const totRow = totalD ? `<div class="sk tot">${t('Spielzeit','Playing time')}</div><div class="tot"></div>
-    <div class="sdur tot">${fmtDur(totalD)} min</div>` : '';
+  // Eigene Flex-Zeile statt weiterer Grid-Zellen mit border-top — eine leere Grid-Zelle hat
+  // keine Text-Baseline, was die Linie zuvor gegenueber den Satz-Zeilen sichtbar verschoben hat.
+  const totRow = totalD ? `<div class="tot-row"><span class="sk">${t('Spielzeit','Playing time')}</span><span class="sdur">${fmtDur(totalD)} min</span></div>` : '';
   const refs=(m.rf||[]).map(r=>{const [n,c]=r.split('|'); return `${n}${c?` (${c})`:''}`;}).join(' · ');
   const seed = (m.sda||m.sdb) ? `#${m.sda||'?'} vs #${m.sdb||'?'}` : '';
   let wall=null; if(m.ub&&m.ue){ const d=(new Date(m.ue)-new Date(m.ub))/1000; if(d>0&&d<36000) wall=d; }
