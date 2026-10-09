@@ -85,13 +85,59 @@ NATIONAL_NAME_PREFIX_RE = re.compile(
     r"^(AUT NT|GER NT|GER RTB)\s*-\s*|"
     r"^(Austrian Beachvolleyball\s*Tour\s*Pro|German Beach Tour|Rock the Beach)\s+", re.I)
 
+# FIVB-Profitour ueber das VIS-Strukturfeld "Type" statt ueber den Turniernamen erkennen: der
+# Name ist Marketing und hat sich schon mehrfach geaendert ("BPT Elite16 Doha" 2023-2025,
+# "BPT Elite Saquarema" 2026, "Beach Elite Joao Pessoa" ab 2027 - mit dem alten "\bBPT\b"-Check
+# fiel 2027 dadurch die komplette Tour raus), der Type-Wert blieb dabei unveraendert.
+# 3 = "WorldSeries" und 4 = "WorldChamp" laut VIS-Doku (BeachTournamentType), World Series ist ab
+# 2027 die hoechste Stufe ueber Elite. 51-54 sind undokumentiert, aber 2022-2027 durchgaengig
+# Elite/Challenge/Futures bzw. das Saisonfinale ("Doha Beach Pro Tour Finals 2022", "BPT Finals
+# Doha 2023", "BPT The Finals Doha" - drei Namen fuer dasselbe Format).
+# Ueber den Typ statt den Namen fehlten vorher unbemerkt: die komplette WM 2023 ("World
+# Championships 2023 - Tlaxcala Mexico"), das Finale 2022 und 16 Futures 2023 ohne BPT-Praefix.
+FIVB_TOUR_TYPE = {"3": "World Series", "4": "World Champs", "51": "Elite", "52": "Challenge",
+                  "53": "Futures", "54": "Finals"}
+# Typen, die wir als internationale FIVB-Tour erwarten wuerden — fallen solche durch classify(),
+# warnt main() im Log (s. report_unclassified), statt dass eine Umbenennung still Turniere frisst.
+# Dazu jeder unbekannte neue Typ ab 51 (so kamen 51-54 mit der Pro Tour dazu) ausser 55, das
+# sind Kontinental-/WM-Qualifikationen (NORCECA, U18-Quali), die bewusst nicht aufgenommen werden.
+FIVB_INTL_TYPES = {"0", "1", "2", "3", "4", "32", "33", "38", "39", "40", "41", "42"}
+FIVB_IGNORED_TYPES = {"55"}
+# Marken-/Stufenwoerter, die vorne im Namen stehen, bevor die Stadt kommt ("Beach World Series
+# Dubai", "BPT Futures Coolangatta Beach"). Bewusst wortweise statt als feste Regex je Format:
+# kleinere Umbenennungen ("Beach Pro Series ...") ergeben so weiterhin die richtige Stadt.
+TOUR_NAME_WORDS = {"bpt", "beach", "fivb", "pro", "tour", "elite", "elite16", "challenge",
+                   "future", "futures", "world", "series", "volleyball", "major", "16"}
 
-def classify(name, code="", teams=None, season=None, default_city=""):
+
+def tour_city(name):
+    # Organisatorische Klammerzusaetze gehoeren nicht zur Stadt ("Cervia (New dates confirmed)") —
+    # ausser einer Verschiebung ("Negombo (postponed to 2025)"): das ist fuer die Saison relevant.
+    words = re.sub(r"\s*\((?![^)]*postpon)[^)]*\)\s*$", "", name, flags=re.I).split()
+    while words and words[0].lower() in TOUR_NAME_WORDS:
+        words.pop(0)
+    return " ".join(words) or name.strip()
+
+
+def classify(name, code="", teams=None, season=None, default_city="", vis_type=""):
     """Nur relevante Turniere: FIVB Beach Pro Tour + CEV (+ deren Vorgaenger vor 2023) +
     OeVV/DVV-Nationaltouren + Senior-WM. Sonst None. Rueckgabe: (org, tier, city)."""
     n = name
     if re.search(r"CANCEL", n, re.I):
         return None
+    # Ab 2023 (2022 lief ueber die Alt-Heuristik weiter unten und bleibt im Archiv so)
+    if season is not None and season >= 2023 and vis_type in FIVB_TOUR_TYPE:
+        tier = FIVB_TOUR_TYPE[vis_type]
+        if tier == "Elite" and re.search(r"Elite\s*16", n, re.I):
+            tier = "Elite16"
+        if tier in ("World Champs", "Finals"):
+            # Name traegt hier oft keine oder eine schlecht abtrennbare Stadt; DefaultCity ist
+            # bei diesen Einzelevents (anders als bei der Tour, s. Kommentar oben) zuverlaessig.
+            m_city = re.search(r"\s-\s*(.+)$", n)
+            city = (default_city.strip() or (m_city.group(1).strip() if m_city else "")
+                    or {"World Champs": "World Championships"}.get(tier, tier))
+            return ("FIVB", tier, city)
+        return ("FIVB", tier, tour_city(n))
     if re.search(r"\bBPT\b", n):
         tier = ("Elite16" if "Elite16" in n else "Elite" if "Elite" in n else
                 "Challenge" if "Challenge" in n else "Futures" if re.search(r"Futures?", n) else "Event")
@@ -188,15 +234,44 @@ def classify(name, code="", teams=None, season=None, default_city=""):
     return None
 
 
+def report_unclassified(tournaments):
+    """Internationale FIVB-Turniere, die classify() verworfen hat, im Log melden — unter GitHub
+    Actions als ::warning::, das im Run-Ueberblick sichtbar ist. Grund: eine neue Namens-/Typ-
+    Konvention (zuletzt "BPT" -> "Beach" fuer 2027) liess bisher eine ganze Saison still
+    verschwinden, ohne dass es irgendwo auffiel."""
+    seen = set()
+    for t in tournaments:
+        vt = t.get("Type", "")
+        if vt in FIVB_IGNORED_TYPES or re.search(r"CANCEL", t["Name"], re.I):
+            continue
+        if not (vt in FIVB_INTL_TYPES or (vt.isdigit() and int(vt) >= 51)):
+            continue
+        if classify(t["Name"], t.get("Code", ""), num(t.get("NbTeamsMainDraw")), num(t.get("Season")),
+                    t.get("DefaultCity", ""), vt):
+            continue
+        key = (t["Name"].strip(), vt)
+        if key in seen:
+            continue
+        seen.add(key)
+        msg = f"nicht klassifiziert: {t['Name'].strip()} (Code {t.get('Code')}, Type {vt})"
+        print(f"::warning title=Turnier verworfen::{msg}" if os.environ.get("GITHUB_ACTIONS")
+              else f"[generate] WARNUNG {msg}")
+
+
 def build_events(tournaments):
     """Paart Herren/Damen je Turnier und leitet Status aus dem Datum ab."""
     groups = {}
     for t in tournaments:
         cl = classify(t["Name"], t.get("Code", ""), num(t.get("NbTeamsMainDraw")), num(t.get("Season")),
-                      t.get("DefaultCity", ""))
+                      t.get("DefaultCity", ""), t.get("Type", ""))
         if not cl:
             continue
         org, tier, city = cl
+        # "World Championships 2023 - Tlaxcala Mexico": das Land steht im Frontend ohnehin direkt
+        # neben der Stadt, sonst stuende es doppelt da.
+        country = clean_country(t["CountryName"])
+        if tier in ("World Champs", "Finals") and city.endswith(" " + country):
+            city = city[:-len(country)].rstrip(" ,")
         code = t["Code"]
         if code[:1] in "MW":
             base = code[1:]
@@ -339,6 +414,7 @@ def main():
         f"<Filter Season='{SEASON}'/></Request>").iter("BeachTournament")]
     events = build_events(tour)
     print(f"[generate] {len(events)} relevante Events (FIVB+CEV+ÖVV/DVV)")
+    report_unclassified(tour)
 
     # Ergebnisse fuer gespielte/laufende Events – Herren- UND Damen-Turnier je Event
     todo = []
@@ -361,16 +437,31 @@ def main():
                             players.add(p)
     print(f"[generate] {sum(len(v) for v in results.values())} Matches · {len(players)} Spieler")
 
+    out = f"data/{SEASON}.json"
     profiles = {}
     with cf.ThreadPoolExecutor(max_workers=12) as ex:
         for no, bio in ex.map(get_player, sorted(players)):
             if bio:
                 profiles[str(no)] = bio
+    # VIS drosselt bei vielen Anfragen am Stueck zeitweise mit HTTP 403 — get_player() liefert dann
+    # still None. Ohne Rueckfall wuerde ein einziger gedrosselter Lauf hunderte Profile aus der
+    # Datei loeschen und so committen (lokal beobachtet: 2224 statt 2336 Profile). Bereits bekannte
+    # Profile daher aus der bisherigen Datei weiterverwenden.
+    missing = [str(p) for p in players if str(p) not in profiles]
+    if missing:
+        try:
+            with open(out, encoding="utf-8") as f:
+                prev = json.load(f).get("players", {})
+        except (OSError, ValueError):
+            prev = {}
+        reused = [no for no in missing if no in prev]
+        for no in reused:
+            profiles[no] = prev[no]
+        print(f"[generate] {len(missing)} Profile nicht abrufbar, {len(reused)} aus bisheriger Datei uebernommen")
 
     data = {"season": SEASON, "generated": TODAY, "events": events,
             "results": results, "venues": venues, "players": profiles}
     os.makedirs("data", exist_ok=True)
-    out = f"data/{SEASON}.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     size = os.path.getsize(out)

@@ -966,7 +966,7 @@ function applyStaticI18n(){
   document.querySelector('#wrGenderToggle .vt[data-g="W"]').textContent=t('Damen','Women');
   document.querySelectorAll('#wrGenderToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.g===genderPref));
 }
-const TIER_COLOR = {Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
+const TIER_COLOR = {'World Series':'#2B3A8C',Finals:'#6E4BB0',Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
   'World Tour':'#3E7CB1','World Champs':'#B0304A','Youth Champs':'#C77A97',Masters:'#8A63D2',National:'#8E7355',
   'Zonal Tour':'#4E8F5C','Rock the Beach':'#3E6B8A'};
@@ -1012,6 +1012,8 @@ const isCountryHl = (ca,cb,org) => !!state.country && !COUNTRY_HL_EXCLUDED_ORGS.
 // ÖVV/DVV "National") zeigen gar keine Stufenzeile — da gibt es nichts zu filtern.
 const ORG_TIER_GROUPS = {
   FIVB: [
+    // ab 2027 hoechste Stufe ueber Elite (generate.py: VIS-Type 3 "WorldSeries")
+    {key:'WorldSeries', label:'World Series', tiers:['World Series'], def:true},
     {key:'Elite', label:'Elite', tiers:['Elite16','Elite'], def:true},
     {key:'Challenge', label:'Challenge', tiers:['Challenge'], def:true},
     {key:'Futures', label:'Futures', tiers:['Futures'], def:false},
@@ -1248,13 +1250,13 @@ function render(){
   let html='';
   // Live-Turniere nach Stufe sortiert (Elite vor Challenge vor Futures vor Rest), nicht nach
   // Zufalls-/Datenreihenfolge — die wichtigeren Turniere sollen oben im Pin stehen.
-  const LIVE_TIER_ORDER = {Elite:0, Challenge:1, Futures:2};
+  const LIVE_TIER_ORDER = {WorldSeries:0, Elite:1, Challenge:2, Futures:3};
   // e.status kann kurz veraltet sein (die in index.html eingebetteten Startdaten werden nicht
   // bei jedem Cron-Lauf aktualisiert) — ein laengst beendetes Turnier soll trotzdem nie als
   // "live" aufblitzen, bevor der Hintergrund-Refresh die echten Daten nachlaedt.
   const todayStr = new Date().toISOString().slice(0,10);
   const liveNow = DATA.events.filter(e=>e.status==='live' && e.end>=todayStr)
-    .sort((a,b)=>(LIVE_TIER_ORDER[tierGroup(a.tier,a.org)]??3)-(LIVE_TIER_ORDER[tierGroup(b.tier,b.org)]??3));
+    .sort((a,b)=>(LIVE_TIER_ORDER[tierGroup(a.tier,a.org)]??4)-(LIVE_TIER_ORDER[tierGroup(b.tier,b.org)]??4));
   if(liveNow.length){
     html += `<div class="livepin"><div class="livepin-lab"><span class="pulse"></span>${t('Live jetzt','Live now')}</div>`
       + `<div class="list">${liveNow.map(e=>eventRow(e,true)).join('')}</div></div>`;
@@ -1340,6 +1342,12 @@ const decisiveSets = m => { if(!m.sets) return 0;
   return Math.max(wa,wb); };
 const isFinished = m => m.st==='15' || decisiveSets(m)>=2;
 const isLive = m => played(m) && !isFinished(m);
+// Freilos (Bye): VIS legt fuer den freilosenden Slot ein "beendetes" 0:0-Match an, bei dem nur
+// eine Teamseite ueberhaupt existiert, statt den Platz leer zu lassen. Ohne Sonderbehandlung
+// zaehlt das ueberall als echtes Spiel mit, mit jeweils eigenem Schaden: ein Phantom-Team in der
+// Gruppentabelle, eine erfundene 0:0-Niederlage in der Setzliste (sa===sb -> "verloren"), ein
+// irrefuehrendes "0:0 gegen —" in Liste und Baum.
+const isBye = m => played(m) && (!m.a || !m.b);
 const fmtDur = s => { if(!s) return ''; const m=Math.floor(s/60), ss=Math.round(s%60);
   return ss ? `${m}:${String(ss).padStart(2,'0')}` : `${m}`; };
 // FIVB/IOC-Laendercode (3 Buchstaben) -> ISO-3166-1-alpha-2, fuer Flaggen-Emoji.
@@ -2257,10 +2265,7 @@ function poolStandings(rm, allMatches){
   const get=(nm,fedc)=>{ const e=teams[nm] || (teams[nm]={name:nm,fed:null,w:0,l:0,sw:0,sl:0,pw:0,pl:0}); if(fedc) e.fed=fedc; return e; };
   for(const m of rm){
     if(!isFinished(m)) continue;
-    // Freilos (Bye): "finished" Match mit nur einer Teamseite — ohne diese Sonderbehandlung
-    // wuerde get(undefined,...) ein Phantom-Team in die Tabelle einschleusen und dem echten
-    // Team faelschlich eine 0:0-Niederlage anhaengen (sa===sb===0 -> aWin===false).
-    if(!m.a || !m.b) continue;
+    if(isBye(m)) continue;
     // Ein echtes Walkover ohne jede erfasste Punktzahl (weder sa/sb noch Saetze — VIS markiert
     // es trotzdem als beendet) wuerde hier via +undefined=NaN die komplette Satz-/Punktbilanz
     // des Teams fuer den Rest der Tabelle verseuchen ("NaN" in der Spalte) — solche Matches
@@ -2333,11 +2338,9 @@ function matchRowHtml(m, offset, showPhase){
   const time=dualTime(m.date,m.time,offset,true);
   const mtLabel=`<span class="mt-date">${shortDate(m.date)}</span>${time||'—'}`;
   const phaseTag = showPhase ? `<div class="mt-phase">${roundLabel(m.rc,m.rn)}</div>` : '';
-  // Freilos (Bye): VIS legt fuer den freilosenden Slot ein "finished" Match mit 0:0 an, bei dem
-  // nur eine Teamseite ueberhaupt existiert, statt den Platz leer zu lassen — ohne
-  // Sonderbehandlung wirkte das wie ein echtes 0:0 gegen ein Phantom-Team ("—"). Stattdessen klar
-  // als Freilos labeln, kein Score/Aufklappen (es gab ja kein echtes Spiel).
-  if(played(m) && (!m.a || !m.b)){
+  // Freilos klar als solches labeln statt als 0:0 gegen ein Phantom-Team; kein Score, kein
+  // Aufklappen (es gab ja kein echtes Spiel).
+  if(isBye(m)){
     const team=m.a||m.b, fedc=m.a?m.ca:m.cb;
     return `<div class="match bye${isCountryHl(m.ca,m.cb,cur.ev.org)?' hl-country':''}">
       <span class="match-no">#${m.n}</span>
@@ -2544,10 +2547,7 @@ function buildSeedList(matches){
     const fromQuali = cameFromQuali && hasMainDrawMatch;
     for(const {m,side} of tm.matches){
       if(!isFinished(m)) continue;
-      // Freilos (Bye): "finished" Match ohne echten Gegner (0:0, andere Seite fehlt komplett)
-      // zaehlt nicht als Ergebnis — sonst wuerde ein Team, das per Bye aufgestiegen ist, hier
-      // faelschlich als "Aus: <Runde>" gefuehrt (0:0 -> won===false).
-      if(!m.a || !m.b) continue;
+      if(isBye(m)) continue;  // zaehlt nicht als Ergebnis, sonst "Aus: <Runde>" trotz Aufstieg
       const rank=roundRank(m.rc,m.rn);
       if(rank<bestRank){ bestRank=rank; best={m,side}; }
     }
@@ -2721,15 +2721,18 @@ function renderEntryTiers({rows,deadline}){
 
 function bracketBox(m){
   const done=played(m), live=isLive(m);
-  // Freilos (Bye): "finished" Match ohne echten Gegner — statt eines irrefuehrenden 0:0 gegen
-  // eine "offen"-Box klar als Freilos kennzeichnen, kein Score, nicht aufklickbar (kein echtes
-  // Match dahinter).
-  const isBye = done && (!m.a || !m.b);
+  // Freilos: statt eines irrefuehrenden 0:0 gegen eine "offen"-Box klar als Freilos
+  // kennzeichnen, kein Score, nicht aufklickbar (kein echtes Match dahinter).
+  const bye = isBye(m);
   const A=slotInfo(m,'a'), B=slotInfo(m,'b');
-  const aWin=done && !live && !isBye && +m.sa>+m.sb, bWin=done && !live && !isBye && +m.sb>+m.sa;
-  const brow=(S,win,score,setsHtml,seed)=>`<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="${t(`Aus ${S.roundlab}: ${S.sub}`,`From ${S.roundlab}: ${S.sub}`)}"`:''}>
-    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs${isBye&&S.feeder?' bye-tag':''}">${isBye?(S.feeder?t('Freilos','Bye'):''):(done?score:'')}</span>${done&&!isBye&&setsHtml?setsHtml:''}</div>`;
-  const clk = (done && !isBye) ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}` : '';
+  const aWin=done && !live && !bye && +m.sa>+m.sb, bWin=done && !live && !bye && +m.sb>+m.sa;
+  // Beim Freilos traegt nur die leere (Feeder-)Seite das "Freilos"-Label, die echte bleibt leer.
+  const brow=(S,win,score,setsHtml,seed)=>{
+    const byeSlot = bye && S.feeder;
+    return `<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="${t(`Aus ${S.roundlab}: ${S.sub}`,`From ${S.roundlab}: ${S.sub}`)}"`:''}>
+    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs${byeSlot?' bye-tag':''}">${byeSlot?t('Freilos','Bye'):(done&&!bye?score:'')}</span>${done&&!bye&&setsHtml?setsHtml:''}</div>`;
+  };
+  const clk = (done && !bye) ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}` : '';
   const tag = live ? `<span class="livechip bx-live"><span class="pulse"></span>Live</span>` : '';
   return `<div class="bx ${done?'done':''}${live?' live':''}${clk}">${tag}<span class="bmatchno">#${m.n}</span>
     ${brow(A,aWin,m.sa,setline(m,0),m.sda)}${brow(B,bWin,m.sb,setline(m,1),m.sdb)}</div>`;
