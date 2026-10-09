@@ -509,6 +509,10 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .qbadge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--water);
     border:1px solid color-mix(in srgb,var(--water) 45%,var(--line));border-radius:5px;padding:0 4px;
     margin-left:5px;vertical-align:middle;}
+  /* nicht regulaer beendetes Match (Forfait/Verletzung/Disqualifikation, VIS ResultType) */
+  .rt-tag{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--accent);
+    border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:5px;padding:0 4px;
+    vertical-align:middle;font-style:normal;}
   .standings{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:12.5px;}
   .standings th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
     text-transform:uppercase;color:var(--faint);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--line);}
@@ -1333,14 +1337,19 @@ const roundLabel=(rc,rn)=>{
   return (lang==='de'?ROUND_LABEL_DE:ROUND_LABEL_EN)[rc] || rn || rc || '—';
 };
 
-const played = m => (m.sets && m.sets.length>0) || m.st==='15';
-// Manche VIS-Matches (z.B. nie sauber abgeschlossene Walkover) bleiben dauerhaft auf
-// Status "nicht beendet" haengen, obwohl die Saetze laengst einen klaren Sieger zeigen —
+// VIS BeachMatchStatus: 1 Scheduled, 2 ReadyToStart, 3-11 laufend (InSetN/SetNFinished), ab 12
+// beendet (12 Finished, 13 OfficialResult, 14 Corrected, 15 Closed). Frueher wurde nur 15 als
+// beendet gewertet; 12-14 fielen nur dank decisiveSets nicht auf — eine beendete Aufgabe ohne
+// Saetze in 12-14 waere dagegen als "nicht gespielt" durchgerutscht.
+const stFinished = m => +m.st>=12;
+const played = m => (m.sets && m.sets.length>0) || stFinished(m);
+// Manche VIS-Matches bleiben tatsaechlich dauerhaft in einem Zwischenstatus haengen (im Archiv
+// z.B. 43x "InSet2"/"Set1Finished" usw.), obwohl die Saetze laengst einen klaren Sieger zeigen —
 // ohne diese Zusatzpruefung wuerden sie fuer immer als "Live" haengen bleiben.
 const decisiveSets = m => { if(!m.sets) return 0;
   const wa=m.sets.filter(s=>s[0]>s[1]).length, wb=m.sets.filter(s=>s[1]>s[0]).length;
   return Math.max(wa,wb); };
-const isFinished = m => m.st==='15' || decisiveSets(m)>=2;
+const isFinished = m => stFinished(m) || decisiveSets(m)>=2;
 const isLive = m => played(m) && !isFinished(m);
 // Freilos (Bye): VIS legt fuer den freilosenden Slot ein "beendetes" 0:0-Match an, bei dem nur
 // eine Teamseite ueberhaupt existiert, statt den Platz leer zu lassen. Ohne Sonderbehandlung
@@ -1348,6 +1357,22 @@ const isLive = m => played(m) && !isFinished(m);
 // Gruppentabelle, eine erfundene 0:0-Niederlage in der Setzliste (sa===sb -> "verloren"), ein
 // irrefuehrendes "0:0 gegen —" in Liste und Baum.
 const isBye = m => played(m) && (!m.a || !m.b);
+// Warum ein Match nicht regulaer endete — direkt aus VIS (BeachMatchResultType, Feld "rt"), statt
+// es wie frueher aus fehlenden Punkten zu erraten. 1-12 = je drei Werte (Team A, Team B, beide)
+// fuer Forfait, Verletzung, aus dem Turnier, Disqualifikation.
+const RESULT_KIND = [
+  [()=>t('w.o.','w/o'), ()=>t('Nicht angetreten (Forfait)','Forfeit')],
+  [()=>t('verletzt','inj.'), ()=>t('Aufgabe wegen Verletzung','Retired injured')],
+  [()=>t('ausgesch.','out'), ()=>t('Aus dem Turnier ausgeschieden','Out of the tournament')],
+  [()=>t('disq.','DQ'), ()=>t('Disqualifiziert','Disqualified')],
+];
+function rtTag(m, side){
+  const rt=+m.rt; if(!(rt>=1 && rt<=12)) return '';
+  const who=['a','b','both'][(rt-1)%3];
+  if(who!=='both' && who!==side) return '';
+  const [lab,title]=RESULT_KIND[Math.floor((rt-1)/3)];
+  return ` <span class="rt-tag" title="${title()}">${lab()}</span>`;
+}
 const fmtDur = s => { if(!s) return ''; const m=Math.floor(s/60), ss=Math.round(s%60);
   return ss ? `${m}:${String(ss).padStart(2,'0')}` : `${m}`; };
 // FIVB/IOC-Laendercode (3 Buchstaben) -> ISO-3166-1-alpha-2, fuer Flaggen-Emoji.
@@ -1750,7 +1775,7 @@ const LIVE_MATCH_FIELDS = "NoInTournament TeamAName TeamBName MatchPointsA Match
   +"TeamAFederationCode TeamBFederationCode TeamAPositionInMainDraw TeamBPositionInMainDraw "
   +"Referee1Name Referee1FederationCode Referee2Name Referee2FederationCode "
   +"DurationSet1 DurationSet2 DurationSet3 Temperature Humidity NbSpectators "
-  +"BeginDateTimeUtc EndDateTimeUtc LiveStreamUri BuyTicketsUrl "
+  +"BeginDateTimeUtc EndDateTimeUtc LiveStreamUri BuyTicketsUrl ResultType "
   +"FastestServeTeamAPlayer1 FastestServeTeamAPlayer2 FastestServeTeamBPlayer1 FastestServeTeamBPlayer2 "
   +"NoPlayerA1 NoPlayerA2 NoPlayerB1 NoPlayerB2 "
   +"PointsTeamASet1 PointsTeamBSet1 PointsTeamASet2 PointsTeamBSet2 PointsTeamASet3 PointsTeamBSet3";
@@ -1780,7 +1805,7 @@ async function fetchLiveMatches(no){
       sets, fa:feederL(g('TeamAType')), fb:feederL(g('TeamBType')), d:durs,
       ca:g('TeamAFederationCode')||'', cb:g('TeamBFederationCode')||'', crt:g('Court')||'',
       sda:numL(g('TeamAPositionInMainDraw')), sdb:numL(g('TeamBPositionInMainDraw')), rf:refs,
-      gn:numL(g('No')),
+      gn:numL(g('No')), rt:numL(g('ResultType'))||null,
     };
     const temp=g('Temperature'); if(temp && temp!=='0') rec.temp=parseFloat(temp);
     const hum=g('Humidity'); if(hum && hum!=='0') rec.hum=numL(hum);
@@ -2058,34 +2083,64 @@ function openFromHash(){
 // Bewusst nur als Ergaenzung, nicht als Ersatz: VIS bleibt die primaere, offiziell fuer Dritte
 // freigegebene Quelle; dieser Fallback kann jederzeit ohne Ankuendigung aufhoeren zu
 // funktionieren, ohne dass etwas an der eigentlichen Funktionalitaet kaputtgeht.
-const vwLiveCache={};
+// Erste Quelle ist die offizielle VIS-Live-Schnittstelle (GetBeachLive, Request-ID 6001 laut
+// Fivb.Vis.Model) — derselbe Datenstand, aus dem auch volleyballworld.com zu schoepfen scheint
+// (gleiches JSON-Format). Mit der zuletzt erhaltenen Version antwortet VIS bei unveraenderten
+// Daten nur mit {"data":{"noChanges":null}} (13 Bytes statt kompletter Daten).
+const visLiveCache={};   // gn -> {version, live}
+async function fetchVisLive(gn){
+  const prev=visLiveCache[gn];
+  const xml=`<Request Type='GetBeachLive' No='${gn}'${prev?` Version='${prev.version}'`:''}/>`;
+  try{
+    const r=await fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',
+      headers:{Accept:'application/json'}, body:new URLSearchParams({Request:xml})});
+    if(!r.ok) return prev ? prev.live : null;
+    const j=await r.json();
+    if(j && j.data && 'noChanges' in j.data) return prev ? prev.live : null;
+    const bl=j && j.data && j.data.beachLive;
+    if(!bl) return null;
+    const live={sets:bl.sets||[], matchPointsA:bl.match&&bl.match.matchPointsA, matchPointsB:bl.match&&bl.match.matchPointsB};
+    visLiveCache[gn]={version:bl.version, live};
+    return live;
+  }catch(e){ return prev ? prev.live : null; }
+}
+// Zweite Quelle: volleyballworld.com, undokumentiert. Frueher fuer die ganze Sitzung gecacht —
+// dadurch fror ein live verfolgter Spielstand nach der ersten Abfrage ein, und ein anfangs leeres
+// Ergebnis wurde nie wiederholt. Jetzt nur kurz, damit ein Poll-Takt nicht doppelt anfragt.
+const vwLiveCache={};   // gn -> {t, val}
 async function fetchVWLiveScore(gn){
-  if(vwLiveCache[gn]!==undefined) return vwLiveCache[gn];
+  const c=vwLiveCache[gn];
+  if(c && Date.now()-c.t<10000) return c.val;
+  let val=null;
   try{
     const r=await fetch(`https://en-live.volleyballworld.com/api/v1/live/beach/matches/${gn}`);
-    const j=r.ok ? await r.json() : null;
-    vwLiveCache[gn]=j;
-    return j;
-  }catch(e){ vwLiveCache[gn]=null; return null; }
+    val=r.ok ? await r.json() : null;
+  }catch(e){ val=null; }
+  vwLiveCache[gn]={t:Date.now(), val};
+  return val;
 }
+const hasLiveSets = live => !!live && (live.sets||[]).some(s=>s.pointsTeamA||s.pointsTeamB);
 // Nur die Saetze/Zwischenstaende uebernehmen, "st" (Status) bewusst unangetastet lassen — sobald
-// VIS selbst nachzieht, greift wieder die normale, offizielle Quelle. isLive()/played() erkennen
-// ein Match mit Saetzen aber ohne st="15" bereits von selbst als "laeuft gerade".
-function applyVWFallback(m, vw){
-  if(!vw || played(m)) return m;
-  const sets=(vw.sets||[]).filter(s=>s.pointsTeamA||s.pointsTeamB).map(s=>[s.pointsTeamA,s.pointsTeamB]);
-  if(!sets.length) return m;
-  return {...m, sets, sa:String(vw.matchPointsA??0), sb:String(vw.matchPointsB??0)};
+// VIS selbst nachzieht, greift wieder die normale Matchliste. isLive()/played() erkennen ein Match
+// mit Saetzen aber ohne beendeten Status bereits von selbst als "laeuft gerade".
+function applyLiveScore(m, live){
+  if(!hasLiveSets(live) || played(m)) return m;
+  const sets=live.sets.filter(s=>s.pointsTeamA||s.pointsTeamB).map(s=>[s.pointsTeamA,s.pointsTeamB]);
+  return {...m, sets, sa:String(live.matchPointsA??0), sb:String(live.matchPointsB??0)};
 }
-// Fuer Matches, deren angesetzte Zeit schon vorbei ist, VIS aber noch keine Saetze zeigt, den
-// VW-Fallback versuchen — sonst bleibt "unbekannter Ausgang" faelschlich stundenlang stehen.
-async function enrichWithVWFallback(matches){
+// Fuer Matches, deren angesetzte Zeit schon vorbei ist, deren Matchliste aber noch keine Saetze
+// zeigt (Veranstalter laden Punkte teils verzoegert hoch) — sonst bleibt "unbekannter Ausgang"
+// faelschlich stundenlang stehen. VIS-Live zuerst, volleyballworld.com nur, wenn das nichts hat.
+async function enrichWithLiveScores(matches){
   const now=new Date();
   const candidates=matches.filter(m=>!played(m) && m.gn && m.date && m.time && new Date(`${m.date}T${m.time}`)<=now);
   if(!candidates.length) return matches;
-  const vwResults=await Promise.all(candidates.map(m=>fetchVWLiveScore(m.gn)));
-  const byN=new Map(); candidates.forEach((m,i)=>byN.set(m.n,vwResults[i]));
-  return matches.map(m=>byN.has(m.n) ? applyVWFallback(m,byN.get(m.n)) : m);
+  const lives=await Promise.all(candidates.map(async m=>{
+    const vis=await fetchVisLive(m.gn);
+    return hasLiveSets(vis) ? vis : fetchVWLiveScore(m.gn);
+  }));
+  const byN=new Map(); candidates.forEach((m,i)=>byN.set(m.n,lives[i]));
+  return matches.map(m=>byN.has(m.n) ? applyLiveScore(m,byN.get(m.n)) : m);
 }
 // Match-Fotos von volleyballworld.com — geratene Seiten-URL (kein VIS-Feld dafuer verfuegbar),
 // daher rein bestmoegliche Vermutung mit stillem Abbruch, wenn der Slug nicht passt (kein
@@ -2186,7 +2241,7 @@ function startLivePoll(ev,no){
     try{
       let fresh=await fetchLiveMatches(no);
       if(!fresh.length || !cur || cur.ev!==ev || cur.no!==no) return;
-      fresh=await enrichWithVWFallback(fresh);
+      fresh=await enrichWithLiveScores(fresh);
       DATA.results[no]=fresh; cur.matches=fresh;
       const byN2={}; fresh.forEach(m=>byN2[m.n]=m); cur.byN=byN2;
       reRenderKeepOpen();
@@ -2376,8 +2431,8 @@ function matchRowHtml(m, offset, showPhase){
     <div class="teams">
       ${phaseTag}
       ${liveTag}
-      <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}</span>${setline(m,0)}<span class="pt">${m.sa??'–'}</span></div>
-      <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}</span>${setline(m,1)}<span class="pt">${m.sb??'–'}</span></div>
+      <div class="team ${aWin?'win':''}"><span class="tn">${teamFlag(m.ca)}${m.a||'—'}${seedTag(m.sda)}${rtTag(m,'a')}</span>${setline(m,0)}<span class="pt">${m.sa??'–'}</span></div>
+      <div class="team ${!live&&!aWin?'win':''}"><span class="tn">${teamFlag(m.cb)}${m.b||'—'}${seedTag(m.sdb)}${rtTag(m,'b')}</span>${setline(m,1)}<span class="pt">${m.sb??'–'}</span></div>
     </div>
     <span class="mchev">›</span>
   </div>
@@ -2742,15 +2797,15 @@ function bracketBox(m){
   const A=slotInfo(m,'a'), B=slotInfo(m,'b');
   const aWin=done && !live && !bye && +m.sa>+m.sb, bWin=done && !live && !bye && +m.sb>+m.sa;
   // Beim Freilos traegt nur die leere (Feeder-)Seite das "Freilos"-Label, die echte bleibt leer.
-  const brow=(S,win,score,setsHtml,seed)=>{
+  const brow=(S,win,score,setsHtml,seed,side)=>{
     const byeSlot = bye && S.feeder;
     return `<div class="brow ${win?'win':''} ${S.feeder?'feeder':''}"${S.sub?` title="${t(`Aus ${S.roundlab}: ${S.sub}`,`From ${S.roundlab}: ${S.sub}`)}"`:''}>
-    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}</span><span class="bs${byeSlot?' bye-tag':''}">${byeSlot?t('Freilos','Bye'):(done&&!bye?score:'')}</span>${done&&!bye&&setsHtml?setsHtml:''}</div>`;
+    <span class="bn">${(!S.feeder&&seed)?`<span class="seed">${seed}</span>`:''}${!S.feeder?teamFlag(S.fed):''}${S.name}${S.feeder?'':rtTag(m,side)}</span><span class="bs${byeSlot?' bye-tag':''}">${byeSlot?t('Freilos','Bye'):(done&&!bye?score:'')}</span>${done&&!bye&&setsHtml?setsHtml:''}</div>`;
   };
   const clk = (done && !bye) ? ` clickable" data-n="${m.n}" role="button" tabindex="0" aria-label="${t(`Match-Details ${m.a} gegen ${m.b}`,`Match details ${m.a} vs ${m.b}`)}` : '';
   const tag = live ? `<span class="livechip bx-live"><span class="pulse"></span>Live</span>` : '';
   return `<div class="bx ${done?'done':''}${live?' live':''}${clk}">${tag}<span class="bmatchno">#${m.n}</span>
-    ${brow(A,aWin,m.sa,setline(m,0),m.sda)}${brow(B,bWin,m.sb,setline(m,1),m.sdb)}</div>`;
+    ${brow(A,aWin,m.sa,setline(m,0),m.sda,'a')}${brow(B,bWin,m.sb,setline(m,1),m.sdb,'b')}</div>`;
 }
 
 // Baum-Reihenfolge einmal berechnen — von renderBracket() UND renderList() genutzt,
@@ -3522,7 +3577,7 @@ async function refreshTopLiveMatches(){
   await Promise.all(nos.map(async no=>{
     try{
       let fresh=await fetchLiveMatches(no);
-      if(fresh.length){ fresh=await enrichWithVWFallback(fresh); DATA.results[no]=fresh; }
+      if(fresh.length){ fresh=await enrichWithLiveScores(fresh); DATA.results[no]=fresh; }
     }catch(err){ /* naechster Tick versucht es erneut */ }
   }));
   render();

@@ -234,6 +234,14 @@ def classify(name, code="", teams=None, season=None, default_city="", vis_type="
     return None
 
 
+def is_cancelled(t):
+    """VIS-Turnierstatus 10 = Canceled (laut Fivb.Vis.Model, in der HTML-Doku fehlend). Allein
+    nicht verlaesslich: "BPT Futures Songkhla - CANCELLED" steht auf Status 0, "CSVP ... Santiago
+    (Cancelado)" auf 1 — daher Status ODER Namenszusatz. Status 11 (Postponed) bleibt bewusst
+    drin: der Name traegt dann einen Hinweis wie "(Postponed to 2026)"."""
+    return t.get("Status") == "10" or bool(re.search(r"CANCEL", t["Name"], re.I))
+
+
 def report_unclassified(tournaments):
     """Internationale FIVB-Turniere, die classify() verworfen hat, im Log melden — unter GitHub
     Actions als ::warning::, das im Run-Ueberblick sichtbar ist. Grund: eine neue Namens-/Typ-
@@ -242,7 +250,7 @@ def report_unclassified(tournaments):
     seen = set()
     for t in tournaments:
         vt = t.get("Type", "")
-        if vt in FIVB_IGNORED_TYPES or re.search(r"CANCEL", t["Name"], re.I):
+        if vt in FIVB_IGNORED_TYPES or is_cancelled(t):
             continue
         if not (vt in FIVB_INTL_TYPES or (vt.isdigit() and int(vt) >= 51)):
             continue
@@ -262,6 +270,8 @@ def build_events(tournaments):
     """Paart Herren/Damen je Turnier und leitet Status aus dem Datum ab."""
     groups = {}
     for t in tournaments:
+        if is_cancelled(t):
+            continue
         cl = classify(t["Name"], t.get("Code", ""), num(t.get("NbTeamsMainDraw")), num(t.get("Season")),
                       t.get("DefaultCity", ""), t.get("Type", ""))
         if not cl:
@@ -312,7 +322,7 @@ MATCH_FIELDS = (
     "DurationSet1 DurationSet2 DurationSet3 Temperature Humidity NbSpectators "
     "BeginDateTimeUtc EndDateTimeUtc LiveStreamUri BuyTicketsUrl "
     "FastestServeTeamAPlayer1 FastestServeTeamAPlayer2 FastestServeTeamBPlayer1 FastestServeTeamBPlayer2 "
-    "NoPlayerA1 NoPlayerA2 NoPlayerB1 NoPlayerB2 "
+    "NoPlayerA1 NoPlayerA2 NoPlayerB1 NoPlayerB2 ResultType "
     "PointsTeamASet1 PointsTeamBSet1 PointsTeamASet2 PointsTeamBSet2 PointsTeamASet3 PointsTeamBSet3")
 
 
@@ -360,6 +370,10 @@ def get_matches(no):
             # Match-ID, die volleyballworld.com fuer seine eigene (undokumentierte) Live-API
             # verwendet — als Fallback, wenn VIS selbst noch keinen Punktestand hochgeladen hat.
             "gn": num(a.get("No")),
+            # Warum ein Match endete (VIS BeachMatchResultType): 0 regulaer, sonst 1-3 Forfeit,
+            # 4-6 Verletzung, 7-9 aus dem Turnier, 10-12 disqualifiziert — je Team A/B/beide.
+            # Nur abweichende Werte speichern (0 -> None -> faellt beim Aufraeumen unten weg).
+            "rt": num(a.get("ResultType")) or None,
         }
         # optionale Extras (oft leer)
         for src, dst, f in [("Temperature", "temp", float), ("Humidity", "hum", num), ("NbSpectators", "spec", num)]:
@@ -410,7 +424,7 @@ def main():
     print(f"[generate] Saison {SEASON} · Stand {TODAY}")
     tour = [t.attrib for t in vis(
         "<Request Type='GetBeachTournamentList' "
-        "Fields='No Code Name CountryName DefaultCity StartDateMainDraw EndDateMainDraw Gender Type Season NbTeamsMainDraw'>"
+        "Fields='No Code Name CountryName DefaultCity StartDateMainDraw EndDateMainDraw Gender Type Season NbTeamsMainDraw Status'>"
         f"<Filter Season='{SEASON}'/></Request>").iter("BeachTournament")]
     events = build_events(tour)
     print(f"[generate] {len(events)} relevante Events (FIVB+CEV+ÖVV/DVV)")

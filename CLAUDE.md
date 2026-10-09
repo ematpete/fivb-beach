@@ -56,8 +56,9 @@ Three files matter: `generate.py` (data), `index.html` (the entire frontend), an
 - `results` is keyed by VIS tournament number (`e.M.no` / `e.W.no`), **not** by event.
 - Match records use terse keys to keep the JSON small: `n` (no. in tournament), `a`/`b` (team
   names), `sa`/`sb` (sets won), `ca`/`cb` (federation codes), `rc`/`rn` (round code/name),
-  `st` (VIS status; `'15'` = finished), `sets`, `d` (set durations), `sda`/`sdb` (seeds),
-  `pa`/`pb` (player numbers), `gn` (**global** VIS match number, distinct from `n`).
+  `st` (VIS status; ≥12 = finished, see below), `sets`, `d` (set durations), `sda`/`sdb` (seeds),
+  `pa`/`pb` (player numbers), `gn` (**global** VIS match number, distinct from `n`), `rt`
+  (VIS ResultType, only if not a normal finish).
 
 The GitHub Action regenerates only the current and next season every 20 minutes and commits
 only on change. Archived seasons are never touched — regenerating one is a deliberate manual act.
@@ -130,9 +131,31 @@ browser (all CORS-open):
   fetch fresher data than the hourly cron. Official, authoritative.
 - **`GetImage.asmx`** — player portraits. Always pass `Width=` so FIVB resizes server-side
   (originals are >1MB, resized ~5KB).
+- **VIS `GetBeachLive`** (per match, by global match number `gn`, JSON via `Accept:
+  application/json`) — official live score; pass the last `Version` and VIS answers
+  `{"data":{"noChanges":null}}` if nothing changed. First source in `enrichWithLiveScores()`.
 - **volleyballworld.com** (undocumented) — world ranking, live scores when VIS lags behind, match
   photos. Strictly best-effort supplements: every call is wrapped so that failure degrades
   silently and never breaks a feature.
+
+### VIS documentation
+
+The HTML docs at `fivb.org/VisSDK/VisWebService/` are incomplete (e.g. tournament types stop at
+50, tournament status lacks Canceled/Postponed). The authoritative source is the official model
+package `https://www.fivb.org/VisSDK/Fivb.Vis.Model.zip` — its `Fivb.Vis.Model.xml` lists every
+enum value name (`F:Fivb.Vis.Beach.<Enum>.Val_<Name>`), request type and field. Numeric values
+are on the HTML page of the same name where it exists. Known values worth remembering:
+
+- Tournament `Type`: 51–55 = ProTourElite16/Challenge/Futures/Finals/WorldChampionshipQualification.
+- Tournament `Status`: 10 = Canceled, 11 = Postponed — not reliable alone, names say otherwise
+  sometimes, so `is_cancelled()` checks status *or* name.
+- Match `Status`: ≥12 means finished (12 Finished, 13 OfficialResult, 14 Corrected, 15 Closed),
+  3–11 = set in progress. Some archived matches really are stuck mid-match, hence `decisiveSets`.
+- Match `ResultType` (stored as `rt`, only when ≠0): 1–12 = forfeit/injury/out/disqualified for
+  team A, B or both (three values per kind).
+
+VIS throttles quickly with HTTP 403 (a few seasons of `generate.py` in a row, or ~4 parallel
+requests, were enough). Avoid bulk querying from a local machine.
 
 ## Conventions
 
@@ -143,6 +166,6 @@ browser (all CORS-open):
   codebase. Match that style when adding code.
 - Beware VIS byes: a bye is recorded as a *finished* 0:0 match with only one team side present.
   Any code that counts results, derives standings, or decides "still in the draw" must skip
-  matches where `!m.a || !m.b`.
+  matches where `isBye(m)`.
 - Walkovers may be finished with neither scores nor sets — guard with `Number.isNaN` before
   aggregating, or a single match poisons a whole pool table with `NaN`.
