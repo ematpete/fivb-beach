@@ -2678,6 +2678,12 @@ async function fetchEntryTiers(no){
       fromQuali: inMD && inQu,
     });
   }
+  // Vor dem Meldeschluss teilt FIVB noch niemandem Hauptfeld/Quali zu (IsInMainDraw und
+  // IsInQualification bei allen 0, auch keine Entry Points) — "weder noch" heisst dann nicht
+  // Reserve, sondern schlicht gemeldet. Sonst stand z.B. bei Itapema 2026 sechs Wochen vor
+  // Meldeschluss das komplette Feld unter "Reserve".
+  if(!rows.some(r=>r.tier==='main'||r.tier==='quali'))
+    rows.forEach(r=>{ if(r.tier==='reserve') r.tier='registered'; });
   rows.sort((a,b)=>(b.points??-1)-(a.points??-1));
   const tEl=tourDoc.querySelector('BeachTournament');
   const mainDraw=numL(tEl&&tEl.getAttribute('NbTeamsMainDraw'))||0;
@@ -2688,11 +2694,20 @@ async function fetchEntryTiers(no){
   return result;
 }
 const ENTRY_SECTIONS = [
+  ['registered',['Gemeldet','Registered']],
   ['main',['Hauptfeld','Main draw']], ['quali',['Qualifikation','Qualification']],
   ['reserve',['Reserve','Reserve']], ['withdrawn',['Abgemeldet','Withdrawn']],
 ];
-function renderEntryTiers({rows,deadline}){
+function renderEntryTiers({rows,deadline,mainDraw,quali}){
   if(!rows.length) return `<div class="bkt-note">${t('Für dieses Turnier liegt noch keine Meldeliste vor.','No entry list available yet for this tournament.')}</div>`;
+  const notAllocated = rows.some(r=>r.tier==='registered');
+  const slots = mainDraw ? t(` (${mainDraw} Plätze im Hauptfeld${quali?`, ${quali} in der Qualifikation`:''})`,
+    ` (${mainDraw} main-draw spots${quali?`, ${quali} in qualification`:''})`) : '';
+  const allocNote = notAllocated ? `<p class="bkt-note">${deadline
+      ? t(`Meldeschluss ist am ${fmtDate(deadline)} — erst danach teilt FIVB die Teams Hauptfeld, Qualifikation und Reserve zu${slots}.`,
+          `Entry deadline is ${fmtDate(deadline)} — only after that does FIVB assign teams to main draw, qualification and reserve${slots}.`)
+      : t(`FIVB hat die Teams noch nicht Hauptfeld, Qualifikation und Reserve zugeteilt${slots}.`,
+          `FIVB has not yet assigned teams to main draw, qualification and reserve${slots}.`)}</p>` : '';
   // Vor dem Meldeschluss sind "aktuelle" und "eingefrorene" Einstiegspunkte identisch (nichts ist
   // bisher auseinandergelaufen) — danach zeigen wir stattdessen die (naeherungsweise) aktuellen
   // Setzungspunkte, da VIS selbst kein eigenes "SeedPoints"-Feld liefert.
@@ -2712,7 +2727,7 @@ function renderEntryTiers({rows,deadline}){
       <table class="standings teamstable"><thead><tr><th class="n seedcol">#</th><th>${t('Spieler:in 1','Player 1')}</th><th>${t('Spieler:in 2','Player 2')}</th><th class="n ptscol" title="${ptsLabel}">${t('Pkt.','Pts.')}</th></tr></thead>
       <tbody>${trs}</tbody></table></div>`;
   }).join('');
-  return sections + `<p class="bkt-note">${t(
+  return allocNote + sections + `<p class="bkt-note">${t(
     `Vorläufige Meldeliste — Wildcards und Verbandsquoten können die tatsächliche Zusammensetzung noch
     verschieben. Wird durch die echte Setzliste ersetzt, sobald FIVB den Draw veröffentlicht.`,
     `Provisional entry list — wildcards and federation quotas may still shift the actual field. Will be
