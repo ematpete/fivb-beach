@@ -101,13 +101,24 @@ FIVB_TOUR_TYPE = {"3": "World Series", "4": "World Champs", "51": "Elite", "52":
 # warnt main() im Log (s. report_unclassified), statt dass eine Umbenennung still Turniere frisst.
 # Dazu jeder unbekannte neue Typ ab 51 (so kamen 51-54 mit der Pro Tour dazu) ausser 55, das
 # sind Kontinental-/WM-Qualifikationen (NORCECA, U18-Quali), die bewusst nicht aufgenommen werden.
-FIVB_INTL_TYPES = {"0", "1", "2", "3", "4", "32", "33", "38", "39", "40", "41", "42"}
+FIVB_INTL_TYPES = {"0", "1", "2", "3", "4", "5", "32", "33", "38", "39", "40", "41", "42"}
 FIVB_IGNORED_TYPES = {"55"}
 # Marken-/Stufenwoerter, die vorne im Namen stehen, bevor die Stadt kommt ("Beach World Series
 # Dubai", "BPT Futures Coolangatta Beach"). Bewusst wortweise statt als feste Regex je Format:
 # kleinere Umbenennungen ("Beach Pro Series ...") ergeben so weiterhin die richtige Stadt.
 TOUR_NAME_WORDS = {"bpt", "beach", "fivb", "pro", "tour", "elite", "elite16", "challenge",
                    "future", "futures", "world", "series", "volleyball", "major", "16"}
+
+
+def olympic_city(name, default_city=""):
+    """"Men's Olympic Game - Rio 2016", "Tokyo Olympic Games - Men's Tournament", "Olympic Games
+    Paris 2024 - Beach Volleyball": alles ausser dem Ort ist Beiwerk."""
+    if default_city.strip():
+        return default_city.strip()
+    noise = {"men's", "women's", "olympic", "olympics", "game", "games", "tournament", "beach",
+             "volleyball", "-"}
+    words = [w for w in name.split() if w.lower() not in noise and not re.fullmatch(r"\d{4}", w)]
+    return " ".join(words) or "Olympic Games"
 
 
 def tour_city(name):
@@ -125,6 +136,12 @@ def classify(name, code="", teams=None, season=None, default_city="", vis_type="
     n = name
     if re.search(r"CANCEL", n, re.I):
         return None
+    # Olympische Spiele (VIS-Type 5) in jeder Saison: fehlten bisher komplett (Rio 2016: Code
+    # "Rio2016M" passt nicht ins M/W-Stadtkuerzel-Muster der Alt-Heuristik; Paris 2024: Type 5
+    # stand nicht in FIVB_TOUR_TYPE) bzw. liefen als "World Tour" mit dem Turniernamen als Stadt
+    # (Tokio 2021) — und damit auch im Head-to-Head, wo gerade diese Duelle zaehlen.
+    if vis_type == "5":
+        return ("FIVB", "Olympics", olympic_city(n, default_city))
     # Ab 2023 (2022 lief ueber die Alt-Heuristik weiter unten und bleibt im Archiv so)
     if season is not None and season >= 2023 and vis_type in FIVB_TOUR_TYPE:
         tier = FIVB_TOUR_TYPE[vis_type]
@@ -214,6 +231,14 @@ def classify(name, code="", teams=None, season=None, default_city="", vis_type="
         # Frontend wie bei CEV EM/Youth EM separat filtern lassen.
         tier = "Rock the Beach" if re.match(r"GER\s+RTB", n, re.I) or re.search(r"Rock the Beach", n, re.I) else "National"
         city = NATIONAL_NAME_PREFIX_RE.sub("", n).strip() or n.strip()
+        # DVV 2024: Name ist nur der Serienname ("German Beach Tour", "Rock the Beach Deutsche
+        # Beach Tour"), DefaultCity leer, kein einziges Match in VIS (Turnierstatus bis heute
+        # "Open") — 12 Zeilen "German Beach Tour" ohne Ort und Ergebnis waeren reines Rauschen.
+        # Andere nie in VIS abgewickelte Stopps MIT Ort (z.B. DVV 2023) bleiben als Kalender drin.
+        if re.search(r"\bBeach\s+Tour$", city, re.I):
+            if not default_city.strip():
+                return None
+            city = default_city.strip()
         return (NATIONAL_ORG[nat_m.group(1)], tier, city)
     # Alte FIVB-Turnierform (vor 2023): kein "BPT"-Tag, Name = reiner Ortsname.
     # Unterscheidung Top-Tour vs. Zonal/Satellit/Quali ueber Hauptfeldgroesse,
@@ -291,6 +316,9 @@ def build_events(tournaments):
             # M/W (z.B. "NAUT0219"/"NAUT0319" fuer denselben Innsbruck-Stopp) — die Ziffern
             # selbst taugen hier also nicht als Paarungsschluessel, Ort+Datum schon.
             base = f"N|{t['Name'].strip()}|{t['StartDateMainDraw']}"
+        elif code[-1:] in "MW":
+            # Geschlecht als Suffix statt Praefix ("Rio2016M"/"Rio2016W", Olympia 2016)
+            base = code[:-1]
         else:
             base = code
         g = groups.setdefault(base, {
@@ -428,7 +456,10 @@ def main():
         f"<Filter Season='{SEASON}'/></Request>").iter("BeachTournament")]
     events = build_events(tour)
     print(f"[generate] {len(events)} relevante Events (FIVB+CEV+ÖVV/DVV)")
-    report_unclassified(tour)
+    # Nur fuer die Typ-basierte Aera: davor schliesst die Alt-Heuristik 1-/2-Sterne-Turniere u.ae.
+    # absichtlich aus, jede Meldung waere dort Rauschen.
+    if SEASON >= 2023:
+        report_unclassified(tour)
 
     # Ergebnisse fuer gespielte/laufende Events – Herren- UND Damen-Turnier je Event
     todo = []
@@ -452,9 +483,21 @@ def main():
     print(f"[generate] {sum(len(v) for v in results.values())} Matches · {len(players)} Spieler")
 
     out = f"data/{SEASON}.json"
+    try:
+        with open(out, encoding="utf-8") as f:
+            prev = json.load(f).get("players", {})
+    except (OSError, ValueError):
+        prev = {}
+    # Archiv-Saisons: bekannte Profile unveraendert uebernehmen und nur neue Spieler abfragen. Ein
+    # Archivlauf stellte sonst ~1500 GetPlayer-Anfragen pro Saison — genau das loeste die VIS-403-
+    # Sperre aus. Die laufende Saison fragt weiter alle ab (z.B. "BeachCurrentTeam" aendert sich).
     profiles = {}
+    to_fetch = sorted(players)
+    if SEASON < dt.date.today().year:
+        profiles = {str(p): prev[str(p)] for p in players if str(p) in prev}
+        to_fetch = [p for p in to_fetch if str(p) not in profiles]
     with cf.ThreadPoolExecutor(max_workers=12) as ex:
-        for no, bio in ex.map(get_player, sorted(players)):
+        for no, bio in ex.map(get_player, to_fetch):
             if bio:
                 profiles[str(no)] = bio
     # VIS drosselt bei vielen Anfragen am Stueck zeitweise mit HTTP 403 — get_player() liefert dann
@@ -463,11 +506,6 @@ def main():
     # Profile daher aus der bisherigen Datei weiterverwenden.
     missing = [str(p) for p in players if str(p) not in profiles]
     if missing:
-        try:
-            with open(out, encoding="utf-8") as f:
-                prev = json.load(f).get("players", {})
-        except (OSError, ValueError):
-            prev = {}
         reused = [no for no in missing if no in prev]
         for no in reused:
             profiles[no] = prev[no]

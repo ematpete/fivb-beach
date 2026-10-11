@@ -19,6 +19,9 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
     --ink:#182831; --muted:#5D6B70; --faint:#8A969A; --line:#E1DBCE;
     --accent:#EC5231; --accent-ink:#fff; --water:#0E8E9C;
     --gold:#C8922A; --silver:#6B7A99; --green:#1FA06A;
+    /* Punkteverlauf (Team A ueber / Team B unter der Nulllinie): mit dem dataviz-Validator
+       gegen die jeweilige Flaeche geprueft — Petrol/Orange, CVD-ΔE ≥ 15, beide Modi bestanden */
+    --chart-a:#008E9E; --chart-b:#EC5231;
     --t-elite16:#EC5231; --t-elite:#C8922A; --t-challenge:#0E8E9C; --t-futures:#79868E;
     --shadow:0 1px 2px rgba(24,40,49,.06),0 8px 28px rgba(24,40,49,.08);
     --radius:14px;
@@ -30,12 +33,14 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   :root[data-theme="light"]{
     --bg:#F1EEE6; --surface:#FBFAF6; --surface-2:#F5F2EA; --ink:#182831; --muted:#5D6B70;
     --faint:#8A969A; --line:#E1DBCE; --accent:#EC5231; --water:#0E8E9C; --gold:#C8922A; --silver:#6B7A99; --green:#1FA06A;
+    --chart-a:#008E9E; --chart-b:#EC5231;
     --t-elite16:#EC5231; --t-elite:#C8922A; --t-challenge:#0E8E9C; --t-futures:#79868E;
     --shadow:0 1px 2px rgba(24,40,49,.06),0 8px 28px rgba(24,40,49,.08);
   }
   :root[data-theme="dark"]{
     --bg:#0D1418; --surface:#141E23; --surface-2:#18242A; --ink:#E9F0EF; --muted:#93A3A6;
     --faint:#65777B; --line:#22323A; --accent:#FF6242; --water:#2CB7C6; --gold:#E0AB47; --silver:#9FB0C9; --green:#33C088;
+    --chart-a:#1BA3B2; --chart-b:#F0563A;
     --t-elite16:#FF6242; --t-elite:#E0AB47; --t-challenge:#2CB7C6; --t-futures:#8598A0;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.45);
   }
@@ -684,6 +689,78 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAt
   .mdmeta .v .faint{color:var(--faint);}
   .mdetail .mdmeta{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
   .mdphotos:empty{display:none;}
+  /* Match-Statistik: Mindestansicht (Punkteherkunft je Team) + aufklappbare zweite Ebene. Die
+     zweite Ebene oeffnet ein schlichter Textbutton mit Chevron statt einer weiteren Box, damit sie
+     nicht wie ein weiteres Match aussieht. */
+  .mdstats:empty{display:none;}
+  .mdstats{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+  .mst-title{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:4px;}
+  .mst{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
+  .mst th{font-family:var(--sans);font-weight:500;color:var(--faint);font-size:10.5px;padding:2px 4px;text-align:left;}
+  .mst td{padding:3px 4px;border-top:1px solid var(--line);color:var(--ink);}
+  .mst .n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;width:46px;}
+  .mst .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mst th:first-child{width:auto;}
+  .mst .mst-tot{font-weight:700;}
+  .mst-players{margin-top:6px;}
+  .mst .lab-s{display:none;}
+  .mst-players .n{width:38px;}
+  .mst-players tr.mst-sep td{border-top-color:var(--faint);}
+  .mst-more{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:6px 0;background:none;
+    border:none;color:var(--water);font:600 12px var(--sans);cursor:pointer;}
+  .mst-more:hover{text-decoration:underline;}
+  .mst-more:focus-visible{outline:2px solid var(--water);outline-offset:2px;border-radius:4px;}
+  .mst-chev{display:inline-block;transition:transform .16s;}
+  .mst-more[aria-expanded="true"] .mst-chev{transform:rotate(90deg);}
+  .mst-extra{padding-top:4px;}
+  .mdstats > .mst-more:first-child{margin-top:0;}
+  /* Punkteverlauf (Vorsprung je Ballwechsel): Linie neutral, Flaeche ueber/unter der Nulllinie
+     als ~12%-Wash in der jeweiligen Teamfarbe, Nulllinie als Haarlinie. Texte in Text-Tokens,
+     die Teamfarbe steckt nur in den kleinen Linien-Schluesseln daneben. */
+  .mom-wrap{margin-top:14px;}
+  .mom-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--muted);margin-bottom:6px;}
+  .mom-legend span{display:inline-flex;align-items:center;gap:6px;min-width:0;}
+  .mom-key{display:inline-block;width:14px;height:2px;border-radius:1px;flex:0 0 auto;}
+  .mom-key-a{background:var(--chart-a);}
+  .mom-key-b{background:var(--chart-b);}
+  .mom{margin-top:8px;}
+  .mom-head{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
+  .mom-set{font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--faint);}
+  .mom-score{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600;}
+  .mom-plot{position:relative;height:52px;}
+  /* feste Hoehe, volle Breite (preserveAspectRatio="none") — mit festem Seitenverhaeltnis war die
+     Grafik am Handy nur ~38px flach und am Desktop fast 100px hoch */
+  .mom-plot svg{display:block;width:100%;height:100%;overflow:visible;cursor:crosshair;}
+  .mom-plot svg:focus-visible{outline:2px solid var(--water);outline-offset:2px;border-radius:4px;}
+  .mom-area-a{fill:var(--chart-a);opacity:.13;}
+  .mom-area-b{fill:var(--chart-b);opacity:.13;}
+  .mom-base{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke;}
+  .mom-line{fill:none;stroke:var(--muted);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;
+    vector-effect:non-scaling-stroke;}
+  .mom-x{stroke:var(--faint);stroke-width:1;vector-effect:non-scaling-stroke;}
+  .mom-dot{position:absolute;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);
+    background:var(--muted);box-shadow:0 0 0 2px var(--surface-2);pointer-events:none;}
+  .mom-dot[hidden]{display:none;}
+  .mom-dot-a{background:var(--chart-a);}
+  .mom-dot-b{background:var(--chart-b);}
+  .mom-val{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+  .mom-head{gap:10px;align-items:baseline;}
+  .mom-read{flex:1;text-align:right;color:var(--muted);font-size:11px;white-space:nowrap;}
+  .mom-read strong{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);}
+  .mom-cap{font-size:10.5px;color:var(--faint);margin-top:3px;display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;}
+  .mst th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  @media (max-width:560px){
+    /* 5-6 Zahlenspalten a 46px liessen am Handy fuer Team-/Spielernamen nur ~3 Zeichen uebrig */
+    .mst .n{width:38px;}
+    .mst .lab-l{display:none;}
+    .mst .lab-s{display:inline;}
+    .mst-players .n{width:29px;}
+    .mst-players .c-att{width:44px;}
+    .mst-players .c-blk{width:36px;}
+    .mst th{font-size:9.5px;padding:2px 2px;}
+    .mst td{padding:3px 2px;font-size:11.5px;}
+  }
   .mdphotos{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
   .mdphotos-lab{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
     color:var(--faint);margin-bottom:6px;}
@@ -970,7 +1047,7 @@ function applyStaticI18n(){
   document.querySelector('#wrGenderToggle .vt[data-g="W"]').textContent=t('Damen','Women');
   document.querySelectorAll('#wrGenderToggle .vt').forEach(x=>x.setAttribute('aria-pressed', x.dataset.g===genderPref));
 }
-const TIER_COLOR = {'World Series':'#2B3A8C',Finals:'#6E4BB0',Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
+const TIER_COLOR = {Olympics:'#0E7C66','World Series':'#2B3A8C',Finals:'#6E4BB0',Elite16:'#EC5231',Elite:'#C8922A',Challenge:'#0E8E9C',Futures:'#79868E',
   EuroBeach:'#7C5BD6',EM:'#D6355A','Nations Cup':'#2E9E6C','CEV Tour':'#5B78C0',CEV:'#5B6B9E',Event:'#79868E',
   'World Tour':'#3E7CB1','World Champs':'#B0304A','Youth Champs':'#C77A97',Masters:'#8A63D2',National:'#8E7355',
   'Zonal Tour':'#4E8F5C','Rock the Beach':'#3E6B8A'};
@@ -1450,29 +1527,43 @@ function teamPlayers(m, side){
     return `<span class="plink" data-p="${no}" role="button" tabindex="0">${ln}</span>`;}).join('/');
 }
 
-// alle Begegnungen zweier Teams — ueber alle (bereits geladenen) Saisonen hinweg
-function encounters(teamA,teamB){
-  const K=[teamA,teamB].sort().join('||'), out=[];
+// Team ueber seine zwei Spielernummern identifizieren statt ueber den Namen: dasselbe Paar steht
+// in VIS unter mehreren Schreibweisen ("Sekerci/Murat G." vs "Murat G./Sekerci", "Wickler/Ehlers"
+// vs "Ehlers/Wickler") — per Namensvergleich fehlten im Archiv 3050 Begegnungen. Spielernummern
+// sind in allen Saisonen bei 100% der Matches vorhanden; der Name bleibt nur als Rueckfall.
+function teamKey(m, side){
+  const p = side==='a' ? m.pa : m.pb, n = side==='a' ? m.a : m.b;
+  if(p && p.length===2 && p[0] && p[1]) return p.map(String).sort().join('+');
+  return n ? 'n:'+n : null;
+}
+// alle Begegnungen der beiden Teams eines Matches — ueber alle (bereits geladenen) Saisonen hinweg.
+// flipped: das Team, das in m auf Seite A steht, stand in mm auf Seite B.
+function encounters(m){
+  const ka=teamKey(m,'a'), kb=teamKey(m,'b'), out=[];
+  if(!ka || !kb) return out;
   for(const sd of Object.values(seasonCache)){
     for(const [tno,ms] of Object.entries(sd.results||{})){
       const ev=eventForTournament(sd,tno);
-      for(const mm of ms)
-        if(isFinished(mm) && [mm.a,mm.b].sort().join('||')===K)
-          out.push({mm, city:((sd.venues||{})[tno]||{}).city||'', tier: ev?ev.tier:''});
+      for(const mm of ms){
+        if(!isFinished(mm)) continue;
+        const xa=teamKey(mm,'a'), xb=teamKey(mm,'b');
+        const flipped = xa===kb && xb===ka;
+        if(!flipped && !(xa===ka && xb===kb)) continue;
+        out.push({mm, flipped, city:((sd.venues||{})[tno]||{}).city||'', tier: ev?ev.tier:''});
+      }
     }
   }
   return out;
 }
 function buildH2H(m){
-  const enc=encounters(m.a,m.b);
+  const enc=encounters(m);
   if(!enc.length) return '';
   let wa=0,wb=0;
-  enc.forEach(({mm})=>{ const w=(+mm.sa>+mm.sb)?mm.a:mm.b; if(w===m.a) wa++; else wb++; });
+  enc.forEach(({mm,flipped})=>{ if((+mm.sa>+mm.sb)!==flipped) wa++; else wb++; });
   // Satzstand immer aus Sicht von m.a:m.b zeigen — in der Historie stehen Teams je
   // nach Match mal als a, mal als b, sonst passt die Zeile nicht zur Gesamtbilanz oben.
   const rows=enc.sort((x,y)=>(y.mm.date||'').localeCompare(x.mm.date||''))
-    .map(({mm,city,tier})=>{
-      const flipped=mm.a!==m.a;
+    .map(({mm,flipped,city,tier})=>{
       const sa=flipped?mm.sb:mm.sa, sb=flipped?mm.sa:mm.sb;
       return `<div class="h2r${mm===m?' cur':''}"><span class="h2d">${mm.date||''}</span>
         <span class="h2c">${tier?tier+' · ':''}${city} · ${roundLabel(mm.rc,mm.rn)}</span><span class="h2s">${sa}:${sb}</span></div>`;
@@ -1728,6 +1819,7 @@ function buildMatchDetail(m){
     <div class="mdhead-team">${teamPlayers(m,'b')} ${fed(m.cb)}</div>
   </div>
     <div class="setgrid">${setg}${totRow}</div>
+    ${played(m) && m.gn && !isBye(m) ? `<div class="mdstats" data-gn="${m.gn}"></div>` : ''}
     <div class="mdmeta">${meta}</div>
     <div class="mdphotos" data-mno="${m.n}"></div>
     ${buildH2H(m)}`;
@@ -2193,6 +2285,206 @@ async function loadMatchPhotos(m, containerEl){
     renderMatchPhotos(photos, containerEl);
   }catch(e){ /* Slug passt vermutlich nicht, oder Netzwerkfehler — naechster Aufruf versucht es erneut */ }
 }
+// ---- Match-Statistik & Punkteverlauf (VIS GetBeachLive) ----
+// Options ist eine Bitmaske (Reihenfolge laut Fivb.Vis.Model "BeachLiveExportOption"; benannte
+// Optionen lehnt VIS mit "BadParameter" ab): 64 RallyScore = jeder Ballwechsel mit Spielstand,
+// 128 MatchStatistics = pro Spieler, 2048 TeamTotalStatistics = pro Team. Echte Statistik gibt es
+// nur, wo FIVB vor Ort erfasst (stichprobenhaft: Elite/Challenge ja; Futures/CEV/OEVV nur Nullen),
+// den Ballwechsel-Verlauf ueberall mit Live-Erfassung (auch Futures). Fehlt beides, bleibt die
+// Sektion leer und das Match-Detail sieht aus wie bisher.
+const MATCH_STATS_OPTIONS = 64|128|2048;
+const matchStatsCache={};   // gn -> {t, data}; beendete Matches fuer die Sitzung, laufende 20 s
+const statsOpen=new Set();  // gn mit aufgeklappten Details — ueberlebt das Live-Neurendern alle 15 s
+async function fetchMatchStats(m){
+  const c=matchStatsCache[m.gn];
+  if(c && (isFinished(m) || Date.now()-c.t<20000)) return c.data;
+  const xml=`<Request Type='GetBeachLive' No='${m.gn}' Options='${MATCH_STATS_OPTIONS}'/>`;
+  const r=await fetch('https://www.fivb.org/Vis2009/XmlRequest.asmx',{method:'POST',
+    headers:{Accept:'application/json'}, body:new URLSearchParams({Request:xml})});
+  if(!r.ok) throw new Error('VIS request failed');
+  const j=await r.json();
+  const bl=j && j.data && j.data.beachLive;
+  const data=bl ? parseMatchStats(bl) : null;
+  matchStatsCache[m.gn]={t:Date.now(), data};
+  return data;
+}
+function parseMatchStats(bl){
+  const mt=bl.match||{};
+  const sideOf=no=>no===mt.noTeamA ? 'a' : no===mt.noTeamB ? 'b' : null;
+  const teams={}, team={}, players={};
+  (bl.teams||[]).forEach(x=>{ const s=sideOf(x.no); if(s) teams[s]=x; });
+  (mt.teamStatistics||[]).forEach(x=>{ const s=sideOf(x.noTeam); if(s) team[s]=x; });
+  (mt.playerStatistics||[]).forEach(x=>{ players[x.noPlayer]=x; });
+  // Ohne Erfassung schickt VIS dieselbe Struktur, nur mit Nullen (bzw. weggelassenen Feldern).
+  const hasStats=['a','b'].some(s=>team[s] && (team[s].totalPoints||0)>0);
+  const sets=(bl.sets||[])
+    .map(s=>(s.events||[]).filter(e=>e.code==='Rally').map(e=>[e.pointsTeamA||0, e.pointsTeamB||0]))
+    .filter(r=>r.length);
+  return {teams, team, players, hasStats, sets};
+}
+async function loadMatchStats(m, el){
+  if(!played(m) || !m.gn || isBye(m)) return;
+  try{
+    const d=await fetchMatchStats(m);
+    if(el.isConnected) renderMatchStats(m, d, el);
+  }catch(e){ /* VIS nicht erreichbar — Match-Detail bleibt wie bisher, naechstes Aufklappen versucht es erneut */ }
+}
+function renderMatchStats(m, d, el){
+  if(!d || (!d.hasStats && !d.sets.length)){ el.innerHTML=''; return; }
+  let html='';
+  if(d.hasStats){
+    // Mindestansicht: wie die Punkte entstanden — Angriff + Asse + Block + Gegnerfehler ergibt
+    // exakt die Gesamtpunkte (am Montreal-Finale 2026 gegen die Satzergebnisse nachgerechnet:
+    // 55 und 51). VIS' eigenes "totalPoints" zaehlt nur die selbst erzielten (ohne Gegnerfehler,
+    // dort 48 und 35) — als Summenspalte daneben waere es daher falsch, also selbst summieren.
+    const row=(s,name)=>{ const x=d.team[s]||{};
+      const sum=(x.spikePoint||0)+(x.servePoint||0)+(x.blockPoint||0)+(x.opponentErrors||0);
+      return `<tr><td class="nm">${name}</td><td class="n">${x.spikePoint||0}</td><td class="n">${x.servePoint||0}</td>
+        <td class="n">${x.blockPoint||0}</td><td class="n">${x.opponentErrors||0}</td><td class="n mst-tot">${sum}</td></tr>`; };
+    html += `<div class="mst-title">${t('Wie die Punkte entstanden','How the points were scored')}</div>
+      <table class="mst"><thead><tr><th></th><th class="n" title="${t('Angriffspunkte','Attack points')}"><span class="lab-l">${t('Angriff','Attack')}</span><span class="lab-s">${t('Angr.','Att.')}</span></th><th class="n">${t('Asse','Aces')}</th>
+        <th class="n">Block</th><th class="n" title="${t('Punkte durch Fehler des Gegners','Points from opponent errors')}"><span class="lab-l">${t('Gegnerf.','Opp. err.')}</span><span class="lab-s">${t('G.-F.','O.E.')}</span></th>
+        <th class="n">${t('Pkt.','Pts')}</th></tr></thead>
+      <tbody>${row('a',m.a)}${row('b',m.b)}</tbody></table>`;
+  }
+  const extra=(d.hasStats ? playerStatsHtml(m,d) : '') + (d.sets.length ? momentumHtml(m,d) : '');
+  if(extra){
+    const open=statsOpen.has(String(m.gn));
+    const lab=d.hasStats ? t('Spielerstatistik & Punkteverlauf','Player stats & point progression') : t('Punkteverlauf','Point progression');
+    html += `<button class="mst-more" type="button" aria-expanded="${open}">${lab}<span class="mst-chev" aria-hidden="true">›</span></button>
+      <div class="mst-extra"${open?'':' hidden'}>${extra}</div>`;
+  }
+  el.innerHTML=html;
+  wireMomentum(el, d);
+}
+function playerStatsHtml(m, d){
+  const nameOf=(no,s,i)=>{
+    const p=(DATA.players||{})[String(no)];
+    if(p && p.ln) return p.ln;
+    return ((s==='a'?m.a:m.b)||'').split('/')[i]?.trim() || '?';
+  };
+  let rows='';
+  for(const s of ['a','b']){
+    const tm=d.teams[s]; if(!tm) continue;
+    [tm.noPlayer1, tm.noPlayer2].forEach((no,i)=>{
+      const p=d.players[no]; if(!p) return;
+      const att=p.spikeTotalAttempts||0, digs=(p.digTotalAttempts||0)-(p.digFault||0);
+      rows += `<tr${s==='b'&&i===0?' class="mst-sep"':''}><td class="nm">${nameOf(no,s,i)}</td>
+        <td class="n c-att">${p.spikePoint||0}/${att}</td><td class="n">${att?Math.round(+p.spikeEfficiencyPercentage||0)+'%':'–'}</td>
+        <td class="n">${p.servePoint||0}</td><td class="n">${p.serveFault||0}</td><td class="n c-blk">${p.blockPoint||0}</td><td class="n">${digs}</td></tr>`;
+    });
+  }
+  return `<table class="mst mst-players"><thead><tr><th>${t('Spieler:in','Player')}</th>
+      <th class="n c-att" title="${t('Angriffspunkte / Angriffe','Attack points / attempts')}">${t('Angr.','Att.')}</th>
+      <th class="n" title="${t('Angriffseffizienz (Punkte minus Fehler, je Angriff)','Attack efficiency (points minus errors, per attempt)')}">Eff.</th>
+      <th class="n" title="${t('Asse','Aces')}">${t('Asse','Aces')}</th>
+      <th class="n" title="${t('Aufschlagfehler','Service errors')}">AF</th>
+      <th class="n c-blk">Block</th>
+      <th class="n" title="${t('Erfolgreiche Abwehraktionen','Successful digs')}">${t('Abw.','Digs')}</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+// Punkteverlauf: pro Satz der Vorsprung von Team A (oben) bzw. Team B (unten) nach jedem
+// Ballwechsel — "ueber/unter einer Grundlinie" ist ein divergierender Job (zwei gegensaetzliche
+// Toene, neutrale Nulllinie). Alle Saetze auf derselben y-Skala, damit sie vergleichbar sind.
+let momSeq=0;
+function setSummary(rallies){
+  let maxA=0, maxB=0, atA='', atB='', changes=0, lastSign=0;
+  rallies.forEach(([a,b])=>{
+    const l=a-b;
+    if(l>maxA){ maxA=l; atA=`${a}:${b}`; }
+    if(-l>maxB){ maxB=-l; atB=`${a}:${b}`; }
+    const sg=Math.sign(l);
+    if(sg && lastSign && sg!==lastSign) changes++;
+    if(sg) lastSign=sg;
+  });
+  return {maxA, maxB, atA, atB, changes};
+}
+const MOM_W=400, MOM_H=44, MOM_PAD=4;
+function momentumHtml(m, d){
+  const W=MOM_W, H=MOM_H, PAD=MOM_PAD, mid=H/2;
+  const maxLead=Math.max(3, ...d.sets.flatMap(r=>r.map(([a,b])=>Math.abs(a-b))));
+  const y=l=>mid - l/maxLead*(mid-PAD);
+  const key=s=>`<span class="mom-key mom-key-${s}" aria-hidden="true"></span>`;
+  const legend=`<div class="mom-legend"><span>${key('a')}${m.a} ${t('führt','leads')}</span><span>${key('b')}${m.b} ${t('führt','leads')}</span></div>`;
+  const charts=d.sets.map((rallies,i)=>{
+    const id=`mom${++momSeq}`, n=rallies.length;
+    const pts=[[0,0],...rallies].map(([a,b],k)=>[k/n*W, y(a-b)]);
+    const line=pts.map(([x,yy],k)=>`${k?'L':'M'}${x.toFixed(1)},${yy.toFixed(1)}`).join('');
+    const area=`${line}L${W},${mid}L0,${mid}Z`;
+    const [fa,fb]=rallies[n-1];
+    const sm=setSummary(rallies);
+    const lead=(v,at)=>v ? `+${v} ${t('bei','at')} ${at}` : '–';
+    const changes=t(`${sm.changes} Führungswechsel`,`${sm.changes} lead change${sm.changes===1?'':'s'}`);
+    // Sichtbare Zusammenfassung als Tabellen-Ersatz (nichts nur per Hover lesbar); welcher Wert zu
+    // welchem Team gehoert, zeigt derselbe Farbschluessel wie in der Legende.
+    const caption=`<span>${t('Max. Vorsprung','Max. lead')}</span><span class="mom-val">${key('a')}${lead(sm.maxA,sm.atA)}</span>`
+      + `<span class="mom-val">${key('b')}${lead(sm.maxB,sm.atB)}</span><span>${changes}</span>`;
+    const ariaCap=t(`Größter Vorsprung ${m.a} ${lead(sm.maxA,sm.atA)}, ${m.b} ${lead(sm.maxB,sm.atB)}, ${changes}`,
+      `Largest lead ${m.a} ${lead(sm.maxA,sm.atA)}, ${m.b} ${lead(sm.maxB,sm.atB)}, ${changes}`);
+    return `<div class="mom" data-set="${i}">
+      <div class="mom-head"><span class="mom-set">${t('Satz','Set')} ${i+1}</span><span class="mom-read" aria-live="polite"></span><span class="mom-score">${fa}:${fb}</span></div>
+      <div class="mom-plot">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" tabindex="0" role="img" aria-label="${t('Satz','Set')} ${i+1}, ${fa}:${fb}. ${ariaCap}. ${t('Mit Pfeiltasten durch die Ballwechsel','Arrow keys step through rallies')}">
+          <defs><clipPath id="${id}a"><rect x="0" y="0" width="${W}" height="${mid}"/></clipPath>
+            <clipPath id="${id}b"><rect x="0" y="${mid}" width="${W}" height="${mid}"/></clipPath></defs>
+          <path class="mom-area-a" d="${area}" clip-path="url(#${id}a)"/>
+          <path class="mom-area-b" d="${area}" clip-path="url(#${id}b)"/>
+          <line class="mom-base" x1="0" x2="${W}" y1="${mid}" y2="${mid}"/>
+          <path class="mom-line" d="${line}"/>
+          <line class="mom-x" x1="0" x2="0" y1="0" y2="${H}" style="display:none"/>
+        </svg>
+        <span class="mom-dot" hidden></span>
+      </div>
+      <div class="mom-cap">${caption}</div>
+    </div>`;
+  }).join('');
+  return `<div class="mom-wrap"><div class="mst-title">${t('Punkteverlauf','Point progression')}</div>${legend}${charts}</div>`;
+}
+function wireMomentum(el, d){
+  const maxLead=Math.max(3, ...d.sets.flatMap(r=>r.map(([a,b])=>Math.abs(a-b))));
+  el.querySelectorAll('.mom').forEach(box=>{
+    const rallies=d.sets[+box.dataset.set], n=rallies.length;
+    // Ablesewert im Kopf der Grafik statt als schwebender Tooltip: der ragte ueber die Grafik
+    // hinaus und haette Satzkopf bzw. die Grafik des Vorsatzes ueberdeckt.
+    const svg=box.querySelector('svg'), xl=svg.querySelector('.mom-x'), dot=box.querySelector('.mom-dot'), read=box.querySelector('.mom-read');
+    const W=MOM_W, H=MOM_H, mid=H/2, PAD=MOM_PAD;
+    let k=null;
+    const show=i=>{
+      k=Math.max(1, Math.min(n, i));
+      const [a,b]=rallies[k-1], x=k/n*W, yy=mid-(a-b)/maxLead*(mid-PAD);
+      // SVG-Elemente kennen kein .hidden — Sichtbarkeit daher ueber style.display. Der Punkt ist ein
+      // HTML-Element ueber der Grafik: das SVG wird (feste Hoehe, volle Breite) ungleich skaliert,
+      // ein SVG-Kreis wuerde dabei zur Ellipse.
+      xl.setAttribute('x1',x); xl.setAttribute('x2',x); xl.style.display='';
+      dot.style.left=`${x/W*100}%`; dot.style.top=`${yy/H*100}%`; dot.hidden=false;
+      dot.className=`mom-dot${a>b?' mom-dot-a':a<b?' mom-dot-b':''}`;
+      const v=document.createElement('strong'); v.textContent=`${a}:${b}`;
+      read.replaceChildren(document.createTextNode(`${t('Ballwechsel','Rally')} ${k} · `), v);
+    };
+    const hide=()=>{ xl.style.display='none'; dot.hidden=true; read.replaceChildren(); k=null; };
+    svg.addEventListener('pointermove', e=>{
+      const r=svg.getBoundingClientRect();
+      show(Math.round((e.clientX-r.left)/r.width*n));
+    });
+    svg.addEventListener('pointerleave', ()=>{ if(document.activeElement!==svg) hide(); });
+    svg.addEventListener('focus', ()=>show(n));
+    svg.addEventListener('blur', hide);
+    svg.addEventListener('keydown', e=>{
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){ e.preventDefault(); show((k??n)+(e.key==='ArrowRight'?1:-1)); }
+      else if(e.key==='Home'){ e.preventDefault(); show(1); }
+      else if(e.key==='End'){ e.preventDefault(); show(n); }
+    });
+  });
+}
+document.addEventListener('click', e=>{
+  const b=e.target.closest('.mst-more'); if(!b) return;
+  const box=b.nextElementSibling, open=box.hasAttribute('hidden');
+  box.toggleAttribute('hidden', !open);
+  b.setAttribute('aria-expanded', open);
+  const gn=b.closest('.mdstats').dataset.gn;
+  if(open) statsOpen.add(gn); else statsOpen.delete(gn);
+});
+
 // Foto-Lightbox: aus jeder .mdphotos-Sektion heraus durch alle ihre Fotos blaettern.
 let photoLbPhotos=[], photoLbIdx=0;
 const photoLbScrim=document.getElementById('photoLbScrim'), photoLb=document.getElementById('photoLb');
@@ -3020,6 +3312,8 @@ function toggleMatch(row){
     const m=cur && cur.byN[+row.dataset.n];
     const photosEl=det.querySelector('.mdphotos');
     if(m && photosEl) loadMatchPhotos(m, photosEl);
+    const statsEl=det.querySelector('.mdstats');
+    if(m && statsEl) loadMatchStats(m, statsEl);
   }
 }
 // Match-Detail-Modal (für Klick im Baum)
@@ -3034,6 +3328,8 @@ function openMatchModal(n){
   document.getElementById('mmClose').focus();
   const photosEl=mmBody.querySelector('.mdphotos');
   if(photosEl) loadMatchPhotos(m, photosEl);
+  const statsEl=mmBody.querySelector('.mdstats');
+  if(statsEl) loadMatchStats(m, statsEl);
 }
 function closeMatchModal(){
   mscrim.classList.remove('open'); mmodal.classList.remove('open'); mmodal.setAttribute('aria-hidden','true');

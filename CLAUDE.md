@@ -74,6 +74,10 @@ or `None` (= irrelevant, drop it), and is a stack of empirically-derived special
   marketing and keep changing (`BPT Elite16 Doha` → `BPT Elite Saquarema` → `Beach Elite Joao
   Pessoa` in 2027); the name-based check silently dropped the whole 2027 tour, the 2023 World
   Championships and 16 Futures. City comes from stripping brand words (`tour_city()`).
+- **Olympic Games** are VIS `Type` 5 and classified for every season (`olympic_city()`); Rio 2016
+  uses gender as a code *suffix* (`Rio2016M`), handled in `build_events()`.
+- **Archive seasons reuse known player profiles** and only fetch new players (a full archive
+  run otherwise sends ~1500 `GetPlayer` requests and gets throttled with HTTP 403).
 - **`report_unclassified()`** warns (as `::warning::` in GitHub Actions) when a tournament of an
   international FIVB type is dropped. Check the Actions run summary for these after a new season
   appears — that is how the next rename will show up.
@@ -134,6 +138,12 @@ browser (all CORS-open):
 - **VIS `GetBeachLive`** (per match, by global match number `gn`, JSON via `Accept:
   application/json`) — official live score; pass the last `Version` and VIS answers
   `{"data":{"noChanges":null}}` if nothing changed. First source in `enrichWithLiveScores()`.
+  `Options` is a numeric **bitmask** (named values are rejected): 64 rally-by-rally score, 128
+  player statistics, 2048 team statistics — used on demand by `loadMatchStats()` for the match
+  detail. Real statistics exist only where FIVB records them (Elite/Challenge); rally data
+  wherever there is live scoring (incl. Futures). Note `totalPoints` excludes opponent errors.
+- **Team head-to-head** matches teams by their two player numbers (`teamKey()`), never by
+  name: the same pair appears under several spellings (`Wickler/Ehlers` vs `Ehlers/Wickler`).
 - **volleyballworld.com** (undocumented) — world ranking, live scores when VIS lags behind, match
   photos. Strictly best-effort supplements: every call is wrapped so that failure degrades
   silently and never breaks a feature.
