@@ -75,7 +75,9 @@ or `None` (= irrelevant, drop it), and is a stack of empirically-derived special
   Pessoa` in 2027); the name-based check silently dropped the whole 2027 tour, the 2023 World
   Championships and 16 Futures. City comes from stripping brand words (`tour_city()`).
 - **Olympic Games** are VIS `Type` 5 and classified for every season (`olympic_city()`); Rio 2016
-  uses gender as a code *suffix* (`Rio2016M`), handled in `build_events()`.
+  uses gender as a code *suffix* (`Rio2016M`), handled in `build_events()`. **Youth Olympic
+  Games** are `Type` 43, but so are the continental YOG qualifiers — only codes `[MW]YOG<year>`
+  are the actual games.
 - **Archive seasons reuse known player profiles** and only fetch new players (a full archive
   run otherwise sends ~1500 `GetPlayer` requests and gets throttled with HTTP 403).
 - **`report_unclassified()`** warns (as `::warning::` in GitHub Actions) when a tournament of an

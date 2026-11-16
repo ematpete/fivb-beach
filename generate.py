@@ -121,6 +121,19 @@ def olympic_city(name, default_city=""):
     return " ".join(words) or "Olympic Games"
 
 
+# Austragungsorte der Olympischen Jugendspiele, falls VIS weder DefaultCity noch einen Ort im
+# Namen hat ("2018 Youth Olympic Games" — Buenos Aires). Selten genug fuer eine feste Liste.
+YOG_HOST = {2010: "Singapore", 2014: "Nanjing", 2018: "Buenos Aires", 2026: "Dakar"}
+
+
+def youth_olympic_city(name, default_city, season):
+    if default_city.strip():
+        return default_city.strip()
+    noise = {"yog", "youth", "olympic", "olympics", "game", "games", "/", "men", "women", "-"}
+    words = [w for w in name.split() if w.lower() not in noise and not re.fullmatch(r"\d{4}", w)]
+    return " ".join(words) or YOG_HOST.get(season, "Youth Olympic Games")
+
+
 def tour_city(name):
     # Organisatorische Klammerzusaetze gehoeren nicht zur Stadt ("Cervia (New dates confirmed)") —
     # ausser einer Verschiebung ("Negombo (postponed to 2025)"): das ist fuer die Saison relevant.
@@ -142,6 +155,15 @@ def classify(name, code="", teams=None, season=None, default_city="", vis_type="
     # (Tokio 2021) — und damit auch im Head-to-Head, wo gerade diese Duelle zaehlen.
     if vis_type == "5":
         return ("FIVB", "Olympics", olympic_city(n, default_city))
+    # Olympische Jugendspiele (VIS-Type 43 "YouthOlympicGames"). Fehlten bisher: Dakar 2026 (Type
+    # nicht abgedeckt), Buenos Aires 2018 (Name "Youth" -> AGE_RE), Nanjing 2014 lief als "World
+    # Tour" mit Stadt "Nanjing YOG / Men". Type 43 tragen 2018 aber auch die kontinentalen
+    # Qualifikationsturniere ("YOGQTAM", "CAZOVA YOG BOY'S QUALIFIER") und ein abgesagtes Test-
+    # Event — die eigentlichen Spiele haben als einzige den Code M/W + "YOG" + Jahr.
+    if vis_type == "43":
+        if re.fullmatch(r"[MW]YOG\d{4}", code):
+            return ("FIVB", "Youth Olympics", youth_olympic_city(n, default_city, season))
+        return None
     # Ab 2023 (2022 lief ueber die Alt-Heuristik weiter unten und bleibt im Archiv so)
     if season is not None and season >= 2023 and vis_type in FIVB_TOUR_TYPE:
         tier = FIVB_TOUR_TYPE[vis_type]
